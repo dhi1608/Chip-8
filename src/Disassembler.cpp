@@ -1,22 +1,16 @@
 /*
-
  * Disassembler.cpp
-
  *
-
  * Created on: Mar 10, 2019
-
  * Author: Brian Green
-
  */
 
 #include <iostream>
-
 #include <fstream>
-
-#include <string>
-
 using namespace std;
+
+//TODO replace current Chip-8 syntax with the instructions from Cowgod's Technical Resource
+// It is more concise and complete than my initial proof of concept instructions
 
 /**
  * Method processes instruction 0 types
