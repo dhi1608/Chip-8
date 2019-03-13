@@ -9,9 +9,6 @@
 #include <fstream>
 using namespace std;
 
-//TODO replace current Chip-8 syntax with the instructions from Cowgod's Technical Resource
-// It is more concise and complete than my initial proof of concept instructions
-
 /**
  * Method processes instruction 0 types
  *
@@ -24,24 +21,18 @@ void processInstruction0(unsigned char *opcode, int index)
 {
 	unsigned char byte1 = opcode[index] & 0xFF;
 	unsigned char byte2 = opcode[index + 1] & 0xFF;
-	if (byte1 == 0x00)
+
+	if (byte1 == 0x00 && byte2 == 0xE0)
 	{
-		if (byte2 == 0xE0)
-		{
-			printf("ERASE");
-		}
-		else if (byte2 == 0xEE)
-		{
-			printf("RETURN");
-		}
-		else
-		{
-			printf("EXECUTE ML");
-		}
+		printf("CLS");
+	}
+	else if (byte1 == 0x00 && byte2 == 0xEE)
+	{
+		printf("RET");
 	}
 	else
 	{
-		printf("EXECUTE ML");
+		printf("SYS %X%02X", byte1, byte2);
 	}
 }
 
@@ -58,25 +49,36 @@ void processInstruction8(unsigned char *opcode, int index)
 	unsigned char x = opcode[index] & 0x0F;
 	unsigned char y = opcode[index + 1] >> 4 & 0x0F;
 	unsigned char mode = opcode[index + 1] & 0x0F;
+
 	switch (mode)
 	{
 	case 0x0:
-		printf("V%X = V%X", x, y);
+		printf("LD V%X, V%X", x, y);
 		break;
 	case 0x1:
-		printf("V%X = V%X / V%X;VF=~VF", x, x, y);
+		printf("OR V%X, V%X", x, y);
 		break;
 	case 0x2:
-		printf("V%X = V%X & V%X;VF=~VF", x, x, y);
+		printf("AND V%X, V%X", x, y);
+		break;
+	case 0x3:
+		printf("XOR V%X, V%X", x, y);
 		break;
 	case 0x4:
-		printf("V%X = V%X + V%X;VF=0x00 or VF=0x01 (rollover)", x, x, y);
+		printf("ADD V%X, V%X", x, y);
 		break;
 	case 0x5:
-		printf("V%X = V%X - V%X;VF=0x00 or VF=0x01 (negative)", x, x, y);
+		printf("SUB V%X, V%X", x, y);
 		break;
-	default:
-		printf("Undocumented instruction X:%X Y:%X Mode:%X", x, y, mode);
+	case 0x6:
+		printf("SHR V%X, {V%X}", x, y);
+		break;
+	case 0x7:
+		printf("SUBN V%X, V%X", x, y);
+		break;
+	case 0xE:
+		printf("SHL V%X, {V%X}", x, y);
+		break;
 	}
 }
 
@@ -92,16 +94,15 @@ void processInstructionE(unsigned char *opcode, int index)
 {
 	unsigned char x = opcode[index] & 0x0F;
 	unsigned char mode = opcode[index + 1] & 0xFF;
+
 	switch (mode)
 	{
 	case 0x9E:
-		printf("SKIP NEXT IF V%X EQ HEX KEY", x);
+		printf("SKP V%X", x);
 		break;
 	case 0xA1:
-		printf("SKIP NEXT IF V%X NE HEX KEY", x);
+		printf("SKNP V%X", x);
 		break;
-	default:
-		printf("Undocumented instruction X:%X Mode:%X", x, mode);
 	}
 }
 
@@ -117,37 +118,36 @@ void processInstructionF(unsigned char *opcode, int index)
 {
 	unsigned char x = opcode[index] & 0x0F;
 	unsigned char mode = opcode[index + 1] & 0xFF;
+
 	switch (mode)
 	{
 	case 0x07:
-		printf("V%X = TIMER", x);
+		printf("LD V%X, DT", x);
 		break;
 	case 0x0A:
-		printf("V%X = HEX KEY (WAIT)", x);
+		printf("LD V%X, K", x);
 		break;
 	case 0x15:
-		printf("TIMER = V%X (01 = 1/60 sec)", x);
+		printf("LD DT, V%X", x);
 		break;
 	case 0x18:
-		printf("TONE DURATION = V%X (01 = 1/60 sec)", x);
+		printf("LD ST, V%X", x);
 		break;
 	case 0x1E:
-		printf("I = I + V%X", x);
+		printf("ADD I, V%X", x);
 		break;
 	case 0x29:
-		printf("I = V%X (ADDRESS OF SPRITE)", x);
+		printf("LD F, V%X", x);
 		break;
 	case 0x33:
-		printf("MI = V%X (3-DECIMAL DIGIT)", x);
+		printf("LD B, V%X", x);
 		break;
 	case 0x55:
-		printf("MI = V0:V%X STORE REG(I = I + X + 1)", x);
+		printf("LD [I], V%X", x);
 		break;
 	case 0x65:
-		printf("V0:V%X MI FILL REG(I = I + X + 1)", x);
+		printf("LD V%X, [I]", x);
 		break;
-	default:
-		printf("Undocumented instruction X:%X Mode:%X", x, mode);
 	}
 }
 
@@ -168,57 +168,52 @@ void disassembleOpCode(unsigned char *opcode, int index)
 	/**
 	 * Print operation based on instruction type
 	 */
-	unsigned char instructionType = opcode[index] >> 4 & 0x0F;
-	switch (instructionType)
+	unsigned char byte1 = opcode[index] & 0x0F;
+	unsigned char byte2 = opcode[index + 1];
+	unsigned char mode = opcode[index] >> 4 & 0x0F;
+	switch (mode)
 	{
 	case 0x0:
 		processInstruction0(opcode, index);
 		break;
 	case 0x1:
-		printf("GOTO %02X%02X", opcode[index] & 0x0F, opcode[index + 1]);
+		printf("JP %02X%02X",byte1, byte2);
 		break;
 	case 0x2:
-		printf("DO SUBROUTINE %02X%02X", opcode[index] & 0x0F,
-				opcode[index + 1]);
+		printf("CALL %02X%02X",byte1, byte2);
 		break;
 	case 0x3:
-		printf("SKIP NEXT IF V%X EQ %02X", opcode[index] & 0x0F,
-				opcode[index + 1]);
+		printf("SE V%X, %02X",byte1, byte2);
 		break;
 	case 0x4:
-		printf("SKIP NEXT IF V%X NE %02X", opcode[index] & 0x0F,
-				opcode[index + 1]);
+		printf("SNE V%X, %02X", byte1, byte2);
 		break;
 	case 0x5:
-		printf("SKIP NEXT IF V%X EQ V%X", opcode[index] & 0x0F,
-				opcode[index + 1] >> 4 & 0x0F);
+		printf("SE V%X, V%X", byte1, byte2 >> 4 & 0x0F);
 		break;
 	case 0x6:
-		printf("V%X = %02X", opcode[index] & 0x0F, opcode[index + 1]);
+		printf("LD V%X, %02X",byte1, byte2);
 		break;
 	case 0x7:
-		printf("V%X + %02X", opcode[index] & 0x0F, opcode[index + 1]);
+		printf("ADD V%X, %02X",byte1, byte2);
 		break;
 	case 0x8:
 		processInstruction8(opcode, index);
 		break;
 	case 0x9:
-		printf("SKIP NEXT IF V%X NE V%X", opcode[index] & 0x0F,
-				opcode[index + 1] >> 4 & 0x0F);
+		printf("SNE V%X, V%X", byte1, byte2 >> 4 & 0x0F);
 		break;
 	case 0xA:
-		printf("I = %02X%02X", opcode[index] & 0x0F, opcode[index + 1]);
+		printf("LD I, %02X%02X",byte1, byte2);
 		break;
 	case 0xB:
-		printf("GOTO %02X%02X + V0", opcode[index] & 0x0F, opcode[index + 1]);
+		printf("JP V0 %02X%02X",byte1, byte2);
 		break;
 	case 0xC:
-		printf("V%X = RANDOM(%02X:%02X)", opcode[index] & 0x0F, 0,
-				opcode[index + 1]);
+		printf("RND V%X, %02X%02X", byte1, byte2);
 		break;
 	case 0xD:
-		printf("SHOW %XMI@V%XV%X", opcode[index + 1] & 0x0F,
-				opcode[index] & 0x0F, opcode[index + 1] >> 4 & 0x0F);
+		printf("DRW V%X, V%X %X", byte1, byte2 >> 4 & 0x0F, byte2 & 0x0F);
 		break;
 	case 0xE:
 		processInstructionE(opcode, index);
@@ -228,7 +223,6 @@ void disassembleOpCode(unsigned char *opcode, int index)
 		break;
 	}
 	printf("\n");
-
 }
 
 /******************************************
@@ -245,7 +239,7 @@ int main(const int argc, const char **argv)
 	if (argc != 2)
 	{
 		printf("Usage: %s <filename>\n", argv[0]);
-		return 1;
+		exit(1);
 	}
 
 	/**
@@ -256,7 +250,7 @@ int main(const int argc, const char **argv)
 	if (!rom)
 	{
 		printf("Unable to open %s\n", argv[1]);
-		return 1;
+		exit(1);
 	}
 
 	/**
@@ -277,7 +271,7 @@ int main(const int argc, const char **argv)
 	int pc = 0;
 	while (pc < romSize)
 	{
-		printf("%04X\t", pc);
+		printf("%04X\t", pc+0x0200);
 		disassembleOpCode((unsigned char*) buffer, pc);
 		pc += OP_CODE_SIZE;
 	}

@@ -9,52 +9,276 @@
 #include <fstream>
 using namespace std;
 
-typedef struct DataRegisters
+typedef struct StateChip8
 {
-	uint8_t v0;
-	uint8_t v1;
-	uint8_t v2;
-	uint8_t v3;
-	uint8_t v4;
-	uint8_t v5;
-	uint8_t v6;
-	uint8_t v7;
-	uint8_t v8;
-	uint8_t v9;
-	uint8_t vA;
-	uint8_t vB;
-	uint8_t vC;
-	uint8_t vD;
-	uint8_t vE;
-	uint8_t vF;
+	// Memory
+	uint8_t *ram;
+	// Data
+	uint8_t v[16];
+	// Registers
+	uint8_t dt;
+	uint8_t st;
+	uint16_t sp;
+	uint16_t pc;
+	uint16_t i;
+} StateChip8;
 
-} DataRegisters;
+const uint16_t CHIP8_LANGUAGE_OFFSET = 0x0000;
+const uint16_t USER_PROGRAM_OFFSET = 0x0200;
+const uint16_t STACK_OFFSET = 0x06A0;
+const uint16_t ADDRESS_REGISTER_OFFSET = 0x06D0;
+const uint16_t DATA_REGISTER_OFFSET = 0x06F0;
+const uint16_t DISPLAY_REFRESH_OFFSET = 0X0700;
+const int RAM_SIZE = 2048;
+const int STACK_DEPTH = 16;
 
-typedef struct InterpreterRegisters
+/**
+ * Identify unimplemented instructions
+ */
+void unimplementedInstruction(StateChip8* state)
 {
-	uint8_t stackPtr;
-	uint16_t programCntr;
-	uint8_t delayTimer;
-	uint8_t soundTimer;
-	uint16_t iPtr:12;
-	uint16_t resv:4;
-} InterpreterRegisters;
+	printf("Error: Unimplemented instruction %04X\n", state->pc);
+	exit(1);
+}
 
-//TODO create a state structure with memory and registers
+
+void incrementSP(StateChip8* state)
+{
+	if (STACK_OFFSET + STACK_DEPTH > state->sp )
+	{
+		++state->sp;
+	}
+	else
+	{
+		printf("Error: Max stack pointer reached can't increment\n");
+	}
+}
+void decrementSP(StateChip8* state)
+{
+	if (STACK_OFFSET < state->sp )
+	{
+		--state->sp;
+	}
+	else
+	{
+		printf("Error: Min stack pointer reached can't decrement\n");
+	}
+}
+/**
+ * Method processes instruction 0 types
+ *
+ * state - chip 8 state data
+ */
+void processInstruction0(StateChip8* state)
+{
+	unsigned char byte1 = state->ram[state->pc] & 0xFF;
+	unsigned char byte2 = state->ram[state->pc + 1] & 0xFF;
+
+	if (byte1 == 0x00 && byte2 == 0xE0)
+	{
+		unimplementedInstruction(state);
+	}
+	else if (byte1 == 0x00 && byte2 == 0xEE)
+	{
+		unimplementedInstruction(state);
+	}
+	else
+	{
+		unimplementedInstruction(state);
+	}
+}
+
+/**
+ * Method processes instruction 8 types
+ *
+ * state - chip 8 state data
+ */
+void processInstruction8(StateChip8* state)
+{
+	unsigned char x = state->ram[state->pc] & 0x0F;
+	unsigned char y = state->ram[state->pc + 1] >> 4 & 0x0F;
+	unsigned char mode = state->ram[state->pc + 1] & 0x0F;
+
+	switch (mode)
+	{
+	case 0x0:
+		unimplementedInstruction(state);
+		break;
+	case 0x1:
+		unimplementedInstruction(state);
+		break;
+	case 0x2:
+		unimplementedInstruction(state);
+		break;
+	case 0x3:
+		unimplementedInstruction(state);
+		break;
+	case 0x4:
+		unimplementedInstruction(state);
+		break;
+	case 0x5:
+		unimplementedInstruction(state);
+		break;
+	case 0x6:
+		unimplementedInstruction(state);
+		break;
+	case 0x7:
+		unimplementedInstruction(state);
+		break;
+	case 0xE:
+		unimplementedInstruction(state);
+		break;
+	}
+}
+
+/**
+ * Method processes instruction E types
+ *
+ * state - chip 8 state data
+ */
+void processInstructionE(StateChip8* state)
+{
+	unsigned char x = state->ram[state->pc] & 0x0F;
+	unsigned char mode = state->ram[state->pc + 1] & 0xFF;
+
+	switch (mode)
+	{
+	case 0x9E:
+		unimplementedInstruction(state);
+		break;
+	case 0xA1:
+		unimplementedInstruction(state);
+		break;
+	}
+}
+
+/**
+ * Method processes instruction F types
+ *
+ * state - chip 8 state data
+ */
+void processInstructionF(StateChip8* state)
+{
+	unsigned char x = state->ram[state->pc] & 0x0F;
+	unsigned char mode = state->ram[state->pc + 1] & 0xFF;
+
+	switch (mode)
+	{
+	case 0x07:
+		unimplementedInstruction(state);
+		break;
+	case 0x0A:
+		unimplementedInstruction(state);
+		break;
+	case 0x15:
+		unimplementedInstruction(state);
+		break;
+	case 0x18:
+		unimplementedInstruction(state);
+		break;
+	case 0x1E:
+		unimplementedInstruction(state);
+		break;
+	case 0x29:
+		unimplementedInstruction(state);
+		break;
+	case 0x33:
+		unimplementedInstruction(state);
+		break;
+	case 0x55:
+		unimplementedInstruction(state);
+		break;
+	case 0x65:
+		unimplementedInstruction(state);
+		break;
+	}
+}
+
+/**
+ * Method emulates the Chip-8 operations
+ * state - chip8 state data
+ */
+void emulateChip8(StateChip8* state)
+{
+	/**
+	 * Print operation based on instruction type
+	 */
+	unsigned char byte1 = state->ram[state->pc] & 0x0F;
+	unsigned char byte2 = state->ram[state->pc + 1];
+	unsigned char mode = state->ram[state->pc] >> 4 & 0x0F;
+	switch (mode)
+	{
+	case 0x0:
+		processInstruction0(state);
+		break;
+	case 0x1:
+		unimplementedInstruction(state);
+		break;
+	case 0x2:
+		incrementSP(state);
+		state->ram[state->sp] = byte1;
+		state->ram[state->sp +1] = byte2;
+		state->pc = byte1 << 8 | byte2;
+		break;
+	case 0x3:
+		unimplementedInstruction(state);
+		break;
+	case 0x4:
+		if (state->v[byte1] != byte2)
+		{
+			state->pc += 2;
+		}
+		break;
+	case 0x5:
+		unimplementedInstruction(state);
+		break;
+	case 0x6:
+		state->v[byte1] = byte2;
+		state->pc += 2;
+		break;
+	case 0x7:
+		unimplementedInstruction(state);
+		break;
+	case 0x8:
+		processInstruction8(state);
+		break;
+	case 0x9:
+		unimplementedInstruction(state);
+		break;
+	case 0xA:
+		unimplementedInstruction(state);
+		break;
+	case 0xB:
+		unimplementedInstruction(state);
+		break;
+	case 0xC:
+		unimplementedInstruction(state);
+		break;
+	case 0xD:
+		unimplementedInstruction(state);
+		break;
+	case 0xE:
+		unimplementedInstruction(state);
+		break;
+	case 0xF:
+		unimplementedInstruction(state);
+		break;
+	}
+}
+
 /******************************************
  * Main method
  ******************************************/
 int main(const int argc, const char **argv)
 {
-	const size_t CHIP8_LANGUAGE_OFFSET = 0x0000;
-	const size_t USER_PROGRAM_OFFSET = 0x0200;
-	const size_t STACK_OFFSET = 0x06A0;
-	const size_t ADDRESS_REGISTER_OFFSET = 0x06D0;
-	const size_t DATA_REGISTER_OFFSET = 0x06F0;
-	const size_t DISPLAY_REFRESH_OFFSET = 0X0700;
+	const uint16_t CHIP8_LANGUAGE_OFFSET = 0x0000;
+	const uint16_t USER_PROGRAM_OFFSET = 0x0200;
+	const uint16_t STACK_OFFSET = 0x06A0;
+	const uint16_t ADDRESS_REGISTER_OFFSET = 0x06D0;
+	const uint16_t DATA_REGISTER_OFFSET = 0x06F0;
+	const uint16_t DISPLAY_REFRESH_OFFSET = 0X0700;
 
 	const int RAM_SIZE = 2048;
-	uint8_t *ram = new uint8_t[RAM_SIZE];
 	/**
 	 * Confirm user has provided correct inputs and provide
 	 * help if they did not
@@ -62,7 +286,7 @@ int main(const int argc, const char **argv)
 	if (argc != 2)
 	{
 		printf("Usage: %s <filename>\n", argv[0]);
-		return 1;
+		exit(1);
 	}
 
 	/**
@@ -73,7 +297,7 @@ int main(const int argc, const char **argv)
 	if (!rom)
 	{
 		printf("Unable to open %s\n", argv[1]);
-		return 1;
+		exit(1);
 	}
 
 	/**
@@ -92,27 +316,32 @@ int main(const int argc, const char **argv)
 		printf(
 				"User program exceeds memory capacity requesting %d available %d",
 				romSize, availableMemory);
-		return 1;
+		exit(1);
 	}
+
+	/**
+	 * Initialize data structures
+	 */
+	uint8_t *buffer = new uint8_t[RAM_SIZE];
+	StateChip8 state;
+	state.ram = buffer;
+	state.sp = STACK_OFFSET;
+	state.pc = USER_PROGRAM_OFFSET;
 
 	/**
 	 * Read ROM into memory and close file
 	 */
-	rom.read((char *) &ram[USER_PROGRAM_OFFSET], romSize);
+	rom.read((char *) &state.ram[USER_PROGRAM_OFFSET], romSize);
 	rom.close();
 
-	//TODO place holder to verify data is stored in correct location
-	// need to add structures next
-	int pc = USER_PROGRAM_OFFSET - 2;
-	while (pc < STACK_OFFSET)
+	while (state.pc < STACK_OFFSET)
 	{
-		printf("%04X\t", pc);
-		printf("%02X%02X\n", ram[pc], ram[pc + 1]);
-		pc += 2;
+		printf("%04X\n", state.pc);
+		emulateChip8(&state);
 	}
 
 	/**
 	 * Cleanup dynamic memory allocation
 	 */
-	delete[] ram;
+	delete[] buffer;
 }
