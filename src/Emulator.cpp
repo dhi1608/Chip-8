@@ -130,15 +130,14 @@ void processInstruction0(StateChip8* state)
 	}
 	else if (byte1 == 0x00 && byte2 == 0xEE)
 	{
+		decrementSP(state);
 		state->pc = state->ram[state->sp] << 8 | state->ram[state->sp + 1];
 		state->ram[state->sp] = 0;
 		state->ram[state->sp + 1] = 0;
-		decrementSP(state);
 	}
 	else
 	{
-		//TODO Don't think there is anything that can be done here except move
-		// the counter to the next instruction.  Check with Brandon.
+		printf("TODO Machine Language subroutine??");
 		incrementPC(state);
 	}
 }
@@ -213,14 +212,20 @@ void processInstructionE(StateChip8* state)
 {
 	uint8_t x = state->ram[state->pc] & 0x0F;
 	uint8_t mode = state->ram[state->pc + 1] & 0xFF;
-
+	uint8_t key;
 	switch (mode)
 	{
 	case 0x9E:
-		unimplementedInstruction(state);
+		printf("TODO check for key [%X] pressed", x);
+		key = state->v[x];
+		if (state->v[x] == key)
+			incrementPC(state);
 		break;
 	case 0xA1:
-		unimplementedInstruction(state);
+		printf("TODO check for key [%X] pressed", x);
+		key = state->v[x];
+		if (state->v[x] != key)
+			incrementPC(state);
 		break;
 	}
 }
