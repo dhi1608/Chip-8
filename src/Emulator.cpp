@@ -7,6 +7,8 @@
 
 #include <iostream>
 #include <fstream>
+#include <cstring>
+
 using namespace std;
 
 const uint16_t CHIP8_LANGUAGE_OFFSET = 0x0000;
@@ -17,30 +19,90 @@ const uint16_t DATA_REGISTER_OFFSET = 0x06F0;
 const uint16_t DISPLAY_REFRESH_OFFSET = 0X0700;
 const int RAM_SIZE = 2048;
 const int STACK_DEPTH = 32;
-const int V_REGISTER_CNT = 16;
+const int ARRAY_SIZE = 16;
+
+typedef struct Sprite
+{
+	uint8_t s[5];
+}Sprite;
 
 typedef struct StateChip8
 {
 	// Memory
 	uint8_t *ram;
 	// Data
-	uint8_t v[V_REGISTER_CNT] =
-	{ 0 };
+	uint8_t *v;
 	// Registers
-	uint8_t dt = 0;
-	uint8_t st = 0;
-	uint16_t sp = 0;
-	uint16_t pc = 0;
-	uint16_t i = 0;
+	uint8_t dt;
+	uint8_t st;
+	uint16_t sp;
+	uint16_t pc;
+	uint16_t i;
+	// Display
+	uint8_t *display;
+	// Key input
+	bool keyCurrent[ARRAY_SIZE];
+	bool keyPrevious[ARRAY_SIZE];
+	bool keyWaiting;
+
 } StateChip8;
 
-/**
- * Identify unimplemented instructions
- */
-void unimplementedInstruction(StateChip8* state)
+void initializeSprites(Sprite* sprite)
 {
-	printf("Error: Unimplemented instruction %04X\n", state->pc);
-	exit(1);
+	for (short i = 0; i < ARRAY_SIZE; ++i)
+	{
+		switch(i)
+		{
+		case 0x00:
+			sprite[i] = { 0xF0,0x90,0x90,0x90,0xF0 };
+			break;
+		case 0x01:
+			sprite[i] = { 0x20,0x60,0x20,0x20,0x70 };
+			break;
+		case 0x02:
+			sprite[i] = { 0xF0,0x10,0xF0,0x80,0xF0 };
+			break;
+		case 0x03:
+			sprite[i] = { 0xF0,0x10,0xF0,0x10,0xF0 };
+			break;
+		case 0x04:
+			sprite[i] = { 0x90,0x90,0xF0,0x10,0x10 };
+			break;
+		case 0x05:
+			sprite[i] = { 0xF0,0x80,0xF0,0x10,0xF0 };
+			break;
+		case 0x06:
+			sprite[i] = { 0xF0,0x80,0xF0,0x90,0xF0 };
+			break;
+		case 0x07:
+			sprite[i] = { 0xF0,0x10,0x20,0x40,0x40 };
+			break;
+		case 0x08:
+			sprite[i] = { 0xF0,0x90,0xF0,0x90,0xF0 };
+			break;
+		case 0x09:
+			sprite[i] = { 0xF0,0x90,0x90,0x10,0xF0 };
+			break;
+		case 0x0A:
+			sprite[i] = { 0xF0,0x90,0x90,0x90,0x90 };
+			break;
+		case 0x0B:
+			sprite[i] = { 0xE0,0x90,0xE0,0x90,0xE0 };
+			break;
+		case 0x0C:
+			sprite[i] = { 0xF0,0x80,0x80,0x80,0xF0 };
+			break;
+		case 0x0D:
+			sprite[i] = { 0xE0,0x90,0x90,0x90,0xE0 };
+			break;
+		case 0x0E:
+			sprite[i] = { 0xF0,0x80,0xF0,0x80,0xF0 };
+			break;
+		case 0x0F:
+			sprite[i] = { 0xF0,0x80,0xF0,0x80,0x80 };
+			break;
+		}
+	}
 }
 
 void printChip8(StateChip8* state)
@@ -49,15 +111,39 @@ void printChip8(StateChip8* state)
 	/**
 	 * Print registers
 	 */
-	printf("PC:%04X       SP:%04X       IP:%04X       DT:%02X/ST:%02X\n",
-			state->pc, state->sp, state->i, state->dt, state->st);
+	printf("PC:%04X       SP:%04X       IP:%04X       DT:%02X/ST:%02X/KW%X\n",
+			state->pc, state->sp, state->i, state->dt, state->st, state->keyWaiting);
 
 	/**
 	 * Print V[0:F]
 	 */
-	for (short i = 1; i <= V_REGISTER_CNT; ++i)
+	for (short i = 1; i <= ARRAY_SIZE; ++i)
 	{
 		printf("V[%X]:%02X", i - 1, state->v[i - 1]);
+		if (i % 4 == 0)
+			printf("\n");
+		else
+			printf("       ");
+	}
+
+	/**
+	 * Print KC[0:F]
+	 */
+	for (short i = 1; i <= ARRAY_SIZE; ++i)
+	{
+		printf("KC[%X]:%02X", i - 1, state->keyCurrent[i - 1]);
+		if (i % 4 == 0)
+			printf("\n");
+		else
+			printf("       ");
+	}
+
+	/**
+	 * Print KP[0:F]
+	 */
+	for (short i = 1; i <= ARRAY_SIZE; ++i)
+	{
+		printf("KP[%X]:%02X", i - 1, state->keyPrevious[i - 1]);
 		if (i % 4 == 0)
 			printf("\n");
 		else
@@ -76,6 +162,18 @@ void printChip8(StateChip8* state)
 			printf("\n");
 		else
 			printf("  ");
+	}
+
+	/**
+	 * Print Display[00:FF]
+	 */
+	for (short i = 1; i <= 256; ++i)
+	{
+		printf("D[%02X]:%04X", i - 1, state->display[i - 1]);
+		if (i % 8 == 0)
+			printf("\n");
+		else
+			printf("       ");
 	}
 	printf("\n");
 }
@@ -114,6 +212,15 @@ void incrementPC(StateChip8* state)
 }
 
 /**
+ * Identify unimplemented instructions
+ */
+void unimplementedInstruction(StateChip8* state)
+{
+	printf("Warn: Unimplemented instruction %04X\n", state->pc);
+	incrementPC(state);
+}
+
+/**
  * Method processes instruction 0 types
  *
  * state - chip 8 state data
@@ -125,8 +232,8 @@ void processInstruction0(StateChip8* state)
 
 	if (byte1 == 0x00 && byte2 == 0xE0)
 	{
-		//TODO save this for display logic implementation
-		unimplementedInstruction(state);
+		memset(state->display, 0, RAM_SIZE - DISPLAY_REFRESH_OFFSET);
+		incrementPC(state);
 	}
 	else if (byte1 == 0x00 && byte2 == 0xEE)
 	{
@@ -137,7 +244,7 @@ void processInstruction0(StateChip8* state)
 	}
 	else
 	{
-		printf("TODO Machine Language subroutine??");
+		printf("TODO Machine Language subroutine?? Should this be ignored or jump into Chip8 ROM??");
 		incrementPC(state);
 	}
 }
@@ -200,6 +307,9 @@ void processInstruction8(StateChip8* state)
 		state->v[0xF] = state->v[x] & 0x80;
 		incrementPC(state);
 		break;
+	default:
+		unimplementedInstruction(state);
+		break;
 	}
 }
 
@@ -212,20 +322,19 @@ void processInstructionE(StateChip8* state)
 {
 	uint8_t x = state->ram[state->pc] & 0x0F;
 	uint8_t mode = state->ram[state->pc + 1] & 0xFF;
-	uint8_t key;
+
 	switch (mode)
 	{
 	case 0x9E:
-		printf("TODO check for key [%X] pressed", x);
-		key = state->v[x];
-		if (state->v[x] == key)
+		if (state->keyCurrent[state->v[x]] != 0)
 			incrementPC(state);
 		break;
 	case 0xA1:
-		printf("TODO check for key [%X] pressed", x);
-		key = state->v[x];
-		if (state->v[x] != key)
+		if (state->keyCurrent[state->v[x]] == 0)
 			incrementPC(state);
+		break;
+	default:
+		unimplementedInstruction(state);
 		break;
 	}
 }
@@ -243,32 +352,80 @@ void processInstructionF(StateChip8* state)
 	switch (mode)
 	{
 	case 0x07:
-		unimplementedInstruction(state);
+		state->v[x] =  state->dt;
+		incrementPC(state);
 		break;
 	case 0x0A:
-		unimplementedInstruction(state);
+	{
+		memcpy(state->keyPrevious, state->keyCurrent, ARRAY_SIZE);
+		if (!state->keyWaiting)
+		{
+			state->keyWaiting = true;
+		}
+		else
+		{
+			for (short i = 0; i < ARRAY_SIZE; ++i)
+			{
+				if (!state->keyPrevious && state->keyCurrent)
+				{
+					state->keyWaiting = false;
+					state->v[x] = i;
+					incrementPC(state);
+					break;
+				}
+			}
+		}
+	}
 		break;
 	case 0x15:
-		unimplementedInstruction(state);
+		state->dt =  state->v[x];
+		incrementPC(state);
 		break;
 	case 0x18:
-		unimplementedInstruction(state);
+		state->st =  state->v[x];
+		incrementPC(state);
 		break;
 	case 0x1E:
-		unimplementedInstruction(state);
+		state->i =  state->i +state->v[x];
+		incrementPC(state);
 		break;
 	case 0x29:
-		unimplementedInstruction(state);
+		state->i = CHIP8_LANGUAGE_OFFSET + (x * sizeof(Sprite));
+		incrementPC(state);
 		break;
 	case 0x33:
-		unimplementedInstruction(state);
+	{
+		uint8_t hundreds;
+		uint8_t tens;
+		uint8_t ones;
+		tens = state->v[x];
+		ones = state->v[x] - tens * 10;
+		hundreds = tens / 10;
+		tens = tens - hundreds * 10;
+		state->ram[state->i] = hundreds;
+		state->ram[state->i + 1] = tens;
+		state->ram[state->i + 2] = ones;
+		incrementPC(state);
+	}
 		break;
 	case 0x55:
-		unimplementedInstruction(state);
+	{
+		for (short i = 0; i < ARRAY_SIZE; ++i)
+			state->ram[state->i + i] = state->v[i];
+		incrementPC(state);
+	}
 		break;
 	case 0x65:
+	{
+		for (short i = 0; i < ARRAY_SIZE; ++i)
+			state->v[i] = state->ram[state->i + i];
+		incrementPC(state);
+	}
+		break;
+	default:
 		unimplementedInstruction(state);
 		break;
+
 	}
 }
 
@@ -326,23 +483,29 @@ void emulateChip8(StateChip8* state)
 			incrementPC(state);
 		break;
 	case 0xA:
-		unimplementedInstruction(state);
+		state->i = byte1 << 8 | byte2;
+		incrementPC(state);
 		break;
 	case 0xB:
-		unimplementedInstruction(state);
+		state->pc = (byte1 << 8 | byte2) + state->v[0];
 		break;
 	case 0xC:
-		unimplementedInstruction(state);
+		state->v[byte1] = (rand() % 256) & byte2;
+		incrementPC(state);
 		break;
 	case 0xD:
 		unimplementedInstruction(state);
 		break;
 	case 0xE:
-		unimplementedInstruction(state);
+		processInstructionE(state);
 		break;
 	case 0xF:
+		processInstructionF(state);
+		break;
+	default:
 		unimplementedInstruction(state);
 		break;
+
 	}
 }
 
@@ -402,12 +565,15 @@ int main(const int argc, const char **argv)
 	/**
 	 * Initialize data structures
 	 */
-	uint8_t buffer[RAM_SIZE] =
-	{ 0 };
 	StateChip8 state;
-	state.ram = buffer;
+	memset(&state, 0, sizeof(StateChip8));
+	state.ram = (uint8_t*)calloc(RAM_SIZE, 1);
+	state.v = &state.ram[DATA_REGISTER_OFFSET];
+	state.display = &state.ram[DISPLAY_REFRESH_OFFSET];
 	state.sp = STACK_OFFSET;
 	state.pc = USER_PROGRAM_OFFSET;
+	Sprite *sprites = (Sprite*)&state.ram[CHIP8_LANGUAGE_OFFSET];
+	initializeSprites(sprites);
 
 	/**
 	 * Read ROM into memory and close file
