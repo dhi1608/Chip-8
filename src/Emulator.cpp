@@ -111,7 +111,7 @@ void printChip8(StateChip8* state)
 	/**
 	 * Print registers
 	 */
-	printf("PC:%04X       SP:%04X       IP:%04X       DT:%02X/ST:%02X/KW%X\n",
+	printf("PC:%04X       SP:%04X       IP:%04X       DT:%02X/ST:%02X/KW:%X\n",
 			state->pc, state->sp, state->i, state->dt, state->st, state->keyWaiting);
 
 	/**
@@ -494,7 +494,22 @@ void emulateChip8(StateChip8* state)
 		incrementPC(state);
 		break;
 	case 0xD:
-		unimplementedInstruction(state);
+	{
+		uint8_t x = byte1;
+		uint8_t y = byte2 >> 4 & 0x0F;
+		uint8_t n = byte2 & 0x0F;
+		state->v[0xF] = 0;
+		for (short i = 0; i < n && i < ARRAY_SIZE; ++i)
+		{
+			uint8_t newSprite = state->ram[state->i + i];
+			uint8_t oldSprite = state->display[state->v[x] + state->v[y] * ARRAY_SIZE];
+			if (newSprite & oldSprite)
+				state->v[0xF] = 1;
+			newSprite ^= oldSprite;
+			state->display[state->v[x] + state->v[y] * ARRAY_SIZE] = newSprite;
+		}
+		incrementPC(state);
+	}
 		break;
 	case 0xE:
 		processInstructionE(state);

@@ -1,17 +1,25 @@
 CC = g++
 OBJS = Emulator.o Disassembler.o
+EMULATOR_EXE = ../bin/Emulator.exe
+DISASSEMBLER_EXE = ../bin/Disassembler.exe
+BIN_DIR = ../bin
 
+all: $(EMULATOR_EXE) $(DISASSEMBLER_EXE)
 
-all: compile link
-
-compile: 
-	$(CC) -g -c Emulator.cpp
-	$(CC) -g -c Disassembler.cpp
-	
-link: 
+$(BIN_DIR):
 	mkdir -p ../bin
-	$(CC) -o ../bin/Emulator.exe Emulator.o
-	$(CC) -o ../bin/Disassembler.exe Disassembler.o
 	
+$(EMULATOR_EXE): $(BIN_DIR) Emulator.o
+	$(CC) -o $(EMULATOR_EXE) Emulator.o
+
+Emulator.o: Emulator.cpp
+	$(CC) -g -c Emulator.cpp
+
+$(DISASSEMBLER_EXE): $(BIN_DIR) Disassembler.o
+	$(CC) -o $(DISASSEMBLER_EXE) Disassembler.o
+
+Disassembler.o: Disassembler.cpp
+	$(CC) -g -c Disassembler.cpp
+
 clean:
-	rm $(OBJS) ../bin/Emulator.exe ../bin/Disassembler.exe
+	rm -rf $(OBJS) $(BIN_DIR)
