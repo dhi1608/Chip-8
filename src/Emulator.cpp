@@ -4,7 +4,7 @@
  * Created on: Mar 11, 2019
  * Author: Brian Green
  */
-
+#include <bitset>
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -47,6 +47,13 @@ typedef struct StateChip8
 
 } StateChip8;
 
+void cpuCycle(StateChip8* state)
+{
+	if (state->dt)
+		--state->dt;
+	if (state->st)
+		--state->st;
+}
 void initializeSprites(Sprite* sprite)
 {
 	for (short i = 0; i < ARRAY_SIZE; ++i)
@@ -128,7 +135,7 @@ void printChip8(StateChip8* state)
 
 	/**
 	 * Print KC[0:F]
-	 */
+	 *
 	for (short i = 1; i <= ARRAY_SIZE; ++i)
 	{
 		printf("KC[%X]:%02X", i - 1, state->keyCurrent[i - 1]);
@@ -140,7 +147,7 @@ void printChip8(StateChip8* state)
 
 	/**
 	 * Print KP[0:F]
-	 */
+	 *
 	for (short i = 1; i <= ARRAY_SIZE; ++i)
 	{
 		printf("KP[%X]:%02X", i - 1, state->keyPrevious[i - 1]);
@@ -150,7 +157,7 @@ void printChip8(StateChip8* state)
 			printf("       ");
 	}
 
-	/**
+	**
 	 * Print Stack
 	 */
 	for (short i = 2; i <= STACK_DEPTH; i += 2)
@@ -238,9 +245,9 @@ void processInstruction0(StateChip8* state)
 	else if (byte1 == 0x00 && byte2 == 0xEE)
 	{
 		decrementSP(state);
-		state->pc = state->ram[state->sp] << 8 | state->ram[state->sp + 1];
-		state->ram[state->sp] = 0;
-		state->ram[state->sp + 1] = 0;
+        state->pc = state->ram[state->sp] << 8 | state->ram[state->sp + 1];
+        state->ram[state->sp] = 0;
+        state->ram[state->sp + 1] = 0;
 	}
 	else
 	{
@@ -450,22 +457,25 @@ void emulateChip8(StateChip8* state)
 		state->pc = byte1 << 8 | byte2;
 		break;
 	case 0x2:
-		state->ram[state->sp] = byte1;
-		state->ram[state->sp + 1] = byte2;
+		state->ram[state->sp] = (state->pc + 2) >> 8;
+		state->ram[state->sp + 1] = (state->pc + 2) & 0xFF;
 		state->pc = byte1 << 8 | byte2;
 		incrementSP(state);
 		break;
 	case 0x3:
 		if (state->v[byte1] == byte2)
 			incrementPC(state);
+		incrementPC(state);
 		break;
 	case 0x4:
 		if (state->v[byte1] != byte2)
 			incrementPC(state);
+		incrementPC(state);
 		break;
 	case 0x5:
 		if (state->v[byte1] == state->v[byte2 >> 4 & 0x0F])
 			incrementPC(state);
+		incrementPC(state);
 		break;
 	case 0x6:
 		state->v[byte1] = byte2;
@@ -481,6 +491,7 @@ void emulateChip8(StateChip8* state)
 	case 0x9:
 		if (state->v[byte1] != state->v[byte2 & 0xF0])
 			incrementPC(state);
+		incrementPC(state);
 		break;
 	case 0xA:
 		state->i = byte1 << 8 | byte2;
@@ -498,15 +509,16 @@ void emulateChip8(StateChip8* state)
 		uint8_t x = byte1;
 		uint8_t y = byte2 >> 4 & 0x0F;
 		uint8_t n = byte2 & 0x0F;
+
 		state->v[0xF] = 0;
 		for (short i = 0; i < n && i < ARRAY_SIZE; ++i)
 		{
 			uint8_t newSprite = state->ram[state->i + i];
-			uint8_t oldSprite = state->display[state->v[x] + state->v[y] * ARRAY_SIZE];
+			uint8_t oldSprite = state->display[i + state->v[x] + state->v[y] * ARRAY_SIZE];
 			if (newSprite & oldSprite)
 				state->v[0xF] = 1;
 			newSprite ^= oldSprite;
-			state->display[state->v[x] + state->v[y] * ARRAY_SIZE] = newSprite;
+			state->display[i + state->v[x] + state->v[y] * ARRAY_SIZE] = newSprite;
 		}
 		incrementPC(state);
 	}
@@ -595,11 +607,14 @@ int main(const int argc, const char **argv)
 	 */
 	rom.read((char *) &state.ram[USER_PROGRAM_OFFSET], romSize);
 	rom.close();
-
+	//TODO remove k
+	char k;
 	printChip8(&state);
 	while (state.pc < STACK_OFFSET)
 	{
+	    //cin >> k;
 		emulateChip8(&state);
 		printChip8(&state);
+		cpuCycle(&state);
 	}
 }

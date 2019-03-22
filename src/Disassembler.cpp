@@ -210,7 +210,7 @@ void disassembleOpCode(unsigned char *opcode, int index)
 		printf("JP V0 %02X%02X",byte1, byte2);
 		break;
 	case 0xC:
-		printf("RND V%X, %02X%02X", byte1, byte2);
+		printf("RND V%X, %02X", byte1, byte2);
 		break;
 	case 0xD:
 		printf("DRW V%X, V%X %X", byte1, byte2 >> 4 & 0x0F, byte2 & 0x0F);
