@@ -18,13 +18,28 @@ const uint16_t ADDRESS_REGISTER_OFFSET = 0x06D0;
 const uint16_t DATA_REGISTER_OFFSET = 0x06F0;
 const uint16_t DISPLAY_REFRESH_OFFSET = 0X0700;
 const int RAM_SIZE = 2048;
+const int DISPLAY_SIZE = RAM_SIZE - DISPLAY_REFRESH_OFFSET;
 const int STACK_DEPTH = 32;
 const int ARRAY_SIZE = 16;
 
-typedef struct Sprite
-{
-	uint8_t s[5];
-}Sprite;
+const uint8_t digits[] = 	{
+			0xF0,0x90,0x90,0x90,0xF0,//0x0
+			0x20,0x60,0x20,0x20,0x70,//0x1
+			0xF0,0x10,0xF0,0x80,0xF0,//0x2
+			0xF0,0x10,0xF0,0x10,0xF0,//0x3
+			0x90,0x90,0xF0,0x10,0x10,//0x4
+			0xF0,0x80,0xF0,0x10,0xF0,//0x5
+			0xF0,0x80,0xF0,0x90,0xF0,//0x6
+			0xF0,0x10,0x20,0x40,0x40,//0x7
+			0xF0,0x90,0xF0,0x90,0xF0,//0x8
+			0xF0,0x90,0x90,0x10,0xF0,//0x9
+			0xF0,0x90,0x90,0x90,0x90,//0xA
+			0xE0,0x90,0xE0,0x90,0xE0,//0xB
+			0xF0,0x80,0x80,0x80,0xF0,//0xC
+			0xE0,0x90,0x90,0x90,0xE0,//0xD
+			0xF0,0x80,0xF0,0x80,0xF0,//0xE
+			0xF0,0x80,0xF0,0x80,0x80 //0xF
+			};
 
 typedef struct StateChip8
 {
@@ -53,63 +68,6 @@ void cpuCycle(StateChip8* state)
 		--state->dt;
 	if (state->st)
 		--state->st;
-}
-void initializeSprites(Sprite* sprite)
-{
-	for (short i = 0; i < ARRAY_SIZE; ++i)
-	{
-		switch(i)
-		{
-		case 0x00:
-			sprite[i] = { 0xF0,0x90,0x90,0x90,0xF0 };
-			break;
-		case 0x01:
-			sprite[i] = { 0x20,0x60,0x20,0x20,0x70 };
-			break;
-		case 0x02:
-			sprite[i] = { 0xF0,0x10,0xF0,0x80,0xF0 };
-			break;
-		case 0x03:
-			sprite[i] = { 0xF0,0x10,0xF0,0x10,0xF0 };
-			break;
-		case 0x04:
-			sprite[i] = { 0x90,0x90,0xF0,0x10,0x10 };
-			break;
-		case 0x05:
-			sprite[i] = { 0xF0,0x80,0xF0,0x10,0xF0 };
-			break;
-		case 0x06:
-			sprite[i] = { 0xF0,0x80,0xF0,0x90,0xF0 };
-			break;
-		case 0x07:
-			sprite[i] = { 0xF0,0x10,0x20,0x40,0x40 };
-			break;
-		case 0x08:
-			sprite[i] = { 0xF0,0x90,0xF0,0x90,0xF0 };
-			break;
-		case 0x09:
-			sprite[i] = { 0xF0,0x90,0x90,0x10,0xF0 };
-			break;
-		case 0x0A:
-			sprite[i] = { 0xF0,0x90,0x90,0x90,0x90 };
-			break;
-		case 0x0B:
-			sprite[i] = { 0xE0,0x90,0xE0,0x90,0xE0 };
-			break;
-		case 0x0C:
-			sprite[i] = { 0xF0,0x80,0x80,0x80,0xF0 };
-			break;
-		case 0x0D:
-			sprite[i] = { 0xE0,0x90,0x90,0x90,0xE0 };
-			break;
-		case 0x0E:
-			sprite[i] = { 0xF0,0x80,0xF0,0x80,0xF0 };
-			break;
-		case 0x0F:
-			sprite[i] = { 0xF0,0x80,0xF0,0x80,0x80 };
-			break;
-		}
-	}
 }
 
 void printChip8(StateChip8* state)
@@ -174,13 +132,14 @@ void printChip8(StateChip8* state)
 	/**
 	 * Print Display[00:FF]
 	 */
-	for (short i = 1; i <= 256; ++i)
+	for (short i = 1; i <= DISPLAY_SIZE; ++i)
 	{
-		printf("D[%02X]:%04X", i - 1, state->display[i - 1]);
+//		printf("D[%02X]:", i - 1);
+		cout << bitset<8>(state->display[i - 1]);
 		if (i % 8 == 0)
 			printf("\n");
 		else
-			printf("       ");
+			printf(" ");
 	}
 	printf("\n");
 }
@@ -239,7 +198,7 @@ void processInstruction0(StateChip8* state)
 
 	if (byte1 == 0x00 && byte2 == 0xE0)
 	{
-		memset(state->display, 0, RAM_SIZE - DISPLAY_REFRESH_OFFSET);
+		memset(state->display, 0, DISPLAY_SIZE);
 		incrementPC(state);
 	}
 	else if (byte1 == 0x00 && byte2 == 0xEE)
@@ -397,7 +356,7 @@ void processInstructionF(StateChip8* state)
 		incrementPC(state);
 		break;
 	case 0x29:
-		state->i = CHIP8_LANGUAGE_OFFSET + (x * sizeof(Sprite));
+		state->i = CHIP8_LANGUAGE_OFFSET + (x * sizeof(digits)/ARRAY_SIZE);
 		incrementPC(state);
 		break;
 	case 0x33:
@@ -513,12 +472,13 @@ void emulateChip8(StateChip8* state)
 		state->v[0xF] = 0;
 		for (short i = 0; i < n && i < ARRAY_SIZE; ++i)
 		{
+			uint8_t position = state->v[x] + ((i + state->v[y]) * ARRAY_SIZE) % DISPLAY_SIZE;
 			uint8_t newSprite = state->ram[state->i + i];
-			uint8_t oldSprite = state->display[i + state->v[x] + state->v[y] * ARRAY_SIZE];
+			uint8_t oldSprite = state->display[position];
 			if (newSprite & oldSprite)
 				state->v[0xF] = 1;
 			newSprite ^= oldSprite;
-			state->display[i + state->v[x] + state->v[y] * ARRAY_SIZE] = newSprite;
+			state->display[position] = newSprite;
 		}
 		incrementPC(state);
 	}
@@ -599,20 +559,17 @@ int main(const int argc, const char **argv)
 	state.display = &state.ram[DISPLAY_REFRESH_OFFSET];
 	state.sp = STACK_OFFSET;
 	state.pc = USER_PROGRAM_OFFSET;
-	Sprite *sprites = (Sprite*)&state.ram[CHIP8_LANGUAGE_OFFSET];
-	initializeSprites(sprites);
+	memcpy(&state.ram[CHIP8_LANGUAGE_OFFSET], &digits, sizeof(digits));
 
 	/**
 	 * Read ROM into memory and close file
 	 */
 	rom.read((char *) &state.ram[USER_PROGRAM_OFFSET], romSize);
 	rom.close();
-	//TODO remove k
-	char k;
+
 	printChip8(&state);
 	while (state.pc < STACK_OFFSET)
 	{
-	    //cin >> k;
 		emulateChip8(&state);
 		printChip8(&state);
 		cpuCycle(&state);
