@@ -1,25 +1,24 @@
 CC = g++
-OBJS = Emulator.o Disassembler.o
-EMULATOR_EXE = ../bin/Emulator.exe
-DISASSEMBLER_EXE = ../bin/Disassembler.exe
+OBJS = Chip8Core.o Chip8Ext.o Chip8.o 
+DEPS = Chip8Core.h Chip8Ext.h Chip8Font.h
 BIN_DIR = ../bin
+CHIP8_EXE = $(BIN_DIR)/Chip8.exe
+CHIP8DECODER_EXE = $(BIN_DIR)/Chip8Decoder.exe
+INC_DIR = /usr/include/SDL2/
 
-all: $(EMULATOR_EXE) $(DISASSEMBLER_EXE)
+all: $(CHIP8_EXE) $(CHIP8DECODER_EXE)
+
+%.o: %.cpp $(DEPS)
+	$(CC) -g -c $< -o $@
 
 $(BIN_DIR):
-	mkdir -p ../bin
+	mkdir -p $(BIN_DIR)
 	
-$(EMULATOR_EXE): $(BIN_DIR) Emulator.o
-	$(CC) -o $(EMULATOR_EXE) Emulator.o
+$(CHIP8_EXE): $(BIN_DIR) $(OBJS)
+	$(CC) -o $(CHIP8_EXE) $(OBJS) -lmingw32 -lSDL2main -lSDL2 -I$(INC_DIR)
 
-Emulator.o: Emulator.cpp
-	$(CC) -g -c Emulator.cpp
-
-$(DISASSEMBLER_EXE): $(BIN_DIR) Disassembler.o
-	$(CC) -o $(DISASSEMBLER_EXE) Disassembler.o
-
-Disassembler.o: Disassembler.cpp
-	$(CC) -g -c Disassembler.cpp
+$(CHIP8DECODER_EXE): $(BIN_DIR) Chip8Decoder.o
+	$(CC) -o $(CHIP8DECODER_EXE) Chip8Decoder.o
 
 clean:
-	rm -rf $(OBJS) $(BIN_DIR)
+	rm -rf *.o $(BIN_DIR)
