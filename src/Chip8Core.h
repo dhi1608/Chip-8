@@ -12,7 +12,7 @@
 /**
  * Flag to print state information
  */
-const bool DEBUG = true;
+const bool DEBUG = false;
 /**
  * Flag to print decoded instructions
  */
