@@ -99,18 +99,12 @@ void updateTimerRegisters(State *state, int delta)
  */
 void setVariables(State *state)
 {
-//	uint16_t nnn; //A 12-bit value, the lowest 12 bits of the instruction
-//	uint8_t kk; // An 8-bit value, the lowest 8 bits of the instruction
-//	uint8_t mode; // A 4-bit value, the upper 4 bits of the high byte of the instruction
-//	uint8_t x; // A 4-bit value, the lower 4 bits of the high byte of the instruction
-//	uint8_t y; // A 4-bit value, the upper 4 bits of the low byte of the instruction
-//	uint8_t n; // A 4-bit value, the lowest 4 bits of the instruction
-//	var.nnn =
-//
-//			uint8_t byte1 = state->ram[state->pc] & 0x0F;
-//			uint8_t byte2 = state->ram[state->pc + 1];
-//			uint8_t mode = state->ram[state->pc] >> 4 & 0x0F;
-
+	var.nnn = ((state->ram[state->pc] & 0x0F) << 8) | state->ram[state->pc + 1];
+    var.kk = state->ram[state->pc + 1];
+    var.mode = (state->ram[state->pc] >> 4) & 0x0F;
+    var.x = state->ram[state->pc] & 0x0F;
+    var.y = (state->ram[state->pc + 1] >> 4) & 0x0F;
+    var.n = state->ram[state->pc + 1] & 0x0F;
 }
 
 /**
@@ -413,7 +407,7 @@ void executeStep(State *state)
 {
 	uint8_t byte1 = state->ram[state->pc] & 0x0F;
 	uint8_t byte2 = state->ram[state->pc + 1];
-	uint8_t mode = state->ram[state->pc] >> 4 & 0x0F;
+	setVariables(state);
 	/* check for key press event */
 	if (state->keyWait != -1 && state->keydown)
 	{
@@ -437,21 +431,21 @@ void executeStep(State *state)
 
 	if (DEBUG)
 		printState(state);
-	switch (mode)
+	switch (var.mode)
 	{
 	case 0x0:
 		processInstruction0(state);
 		break;
 	case 0x1:
 		if (DEBUG1)
-			printf("JP %02X%02X\n", byte1, byte2);
-		state->pc = (byte1 << 8 | byte2) - 2;
+			printf("JP %03X\n", var.nnn);
+		state->pc = var.nnn - 2;
 		break;
 	case 0x2:
 		if (DEBUG1)
-			printf("CALL %02X%02X\n", byte1, byte2);
+			printf("CALL %03X\n", var.nnn);
 		state->stack[state->sp] = state->pc;
-		state->pc = (byte1 << 8 | byte2) - 2;
+		state->pc = var.nnn - 2;
 		incrementSP(state);
 		break;
 	case 0x3:
