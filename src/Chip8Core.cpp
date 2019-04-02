@@ -22,6 +22,7 @@ void initialize(State *state)
 	memset(state, 0, sizeof(State));
 	memcpy(&state->ram[CHIP8_LANGUAGE_OFFSET], &Font4x5, sizeof(Font4x5));
 	state->pc = USER_PROGRAM_OFFSET;
+	state->sp = -1;
 	state->keyWait = -1;
 	currDelta = 0;
 	memset(&var, 0, sizeof(Variables));
@@ -99,12 +100,12 @@ void updateTimerRegisters(State *state, int delta)
  */
 void setVariables(State *state)
 {
-	var.nnn = ((state->ram[state->pc] & 0x0F) << 8) | state->ram[state->pc + 1];
+	var.nnn = ((state->ram[state->pc] & 0xF) << 8) | state->ram[state->pc + 1];
     var.kk = state->ram[state->pc + 1];
-    var.mode = (state->ram[state->pc] >> 4) & 0x0F;
-    var.x = state->ram[state->pc] & 0x0F;
-    var.y = (state->ram[state->pc + 1] >> 4) & 0x0F;
-    var.n = state->ram[state->pc + 1] & 0x0F;
+    var.mode = (state->ram[state->pc] >> 4) & 0xF;
+    var.x = state->ram[state->pc] & 0xF;
+    var.y = (state->ram[state->pc + 1] >> 4) & 0xF;
+    var.n = state->ram[state->pc + 1] & 0xF;
 }
 
 /**
@@ -149,35 +150,50 @@ void printState(State *state)
 
 /**
  * Safely increment stack pointer
+ * returns false on failure
  */
-void incrementSP(State *state)
+bool incrementSP(State *state)
 {
 	if (state->sp < STACK_SIZE - 1)
 		++state->sp;
 	else
+	{
 		printf("Warn: Max stack pointer reached can't increment\n");
+		return false;
+	}
+	return true;
 }
 
 /**
  * Safely decrement stack pointer
+ * returns false on failure
  */
-void decrementSP(State *state)
+bool decrementSP(State *state)
 {
 	if (state->sp)
 		--state->sp;
 	else
+	{
 		printf("Warn: Min stack pointer reached can't decrement\n");
+		return false;
+	}
+	return true;
 }
 
 /**
  * Safely increment program counter
+ * return false on failure
  */
-void incrementPC(State *state)
+bool incrementPC(State *state)
 {
 	if (STACK_OFFSET > state->pc)
 		state->pc += 2;
 	else
+	{
 		printf("Warn: Max program counter reached can't increment\n");
+		return false;
+	}
+	return true;
 }
 
 /**
@@ -185,218 +201,10 @@ void incrementPC(State *state)
  */
 void unimplementedInstruction(State *state)
 {
-	printf("Warn: Unimplemented instruction %04X\n", state->pc);
+	printf("Error: Unimplemented instruction %04X\n", state->pc);
+	printf("Halt system!");
 	printState(state);
 	exit(0);
-}
-
-/**
- * Method processes instruction 0 types
- *
- * state - chip 8 state data
- */
-void processInstruction0(State *state)
-{
-	uint8_t byte1 = state->ram[state->pc] & 0xFF;
-	uint8_t byte2 = state->ram[state->pc + 1] & 0xFF;
-
-	if (byte1 == 0x00 && byte2 == 0xE0)
-	{
-		if (DEBUG1)
-			printf("CLS\n");
-		memset(state->display, 0, DISPLAY_SIZE);
-	}
-	else if (byte1 == 0x00 && byte2 == 0xEE)
-	{
-		if (DEBUG1)
-			printf("RET\n");
-		decrementSP(state);
-		state->pc = state->stack[state->sp];
-		state->stack[state->sp] = 0;
-	}
-	else
-	{
-		unimplementedInstruction(state);
-	}
-}
-
-/**
- * Method processes instruction 8 types
- *
- * state - chip 8 state data
- */
-void processInstruction8(State *state)
-{
-	uint8_t x = state->ram[state->pc] & 0x0F;
-	uint8_t y = state->ram[state->pc + 1] >> 4 & 0x0F;
-	uint8_t mode = state->ram[state->pc + 1] & 0x0F;
-	uint16_t result;
-
-	switch (mode)
-	{
-	case 0x0:
-		if (DEBUG1)
-			printf("LD V%X, V%X\n", x, y);
-		state->v[x] = state->v[y];
-		break;
-	case 0x1:
-		if (DEBUG1)
-			printf("OR V%X, V%X\n", x, y);
-		state->v[x] = state->v[x] | state->v[y];
-		break;
-	case 0x2:
-		if (DEBUG1)
-			printf("AND V%X, V%X\n", x, y);
-		state->v[x] = state->v[x] & state->v[y];
-		break;
-	case 0x3:
-		if (DEBUG1)
-			printf("XOR V%X, V%X\n", x, y);
-		state->v[x] = state->v[x] ^ state->v[y];
-		break;
-	case 0x4:
-		if (DEBUG1)
-			printf("ADD V%X, V%X\n", x, y);
-		result = state->v[x] + state->v[y];
-		state->v[x] = result & 0x00FF;
-		state->v[0xF] = result >> 8;
-		break;
-	case 0x5:
-		if (DEBUG1)
-			printf("SUB V%X, V%X\n", x, y);
-		result = state->v[x] - state->v[y];
-		state->v[x] = result & 0x00FF;
-		state->v[0xF] = ~(result >> 8 & 0x01);
-		break;
-	case 0x6:
-		if (DEBUG1)
-			printf("SHR V%X, {V%X}\n", x, y);
-		state->v[x] =  state->v[x] >> 1;
-		state->v[0xF] = state->v[x] & 0x01;
-		break;
-	case 0x7:
-		if (DEBUG1)
-			printf("SUBN V%X, V%X\n", x, y);
-		result = state->v[y] - state->v[x];
-		state->v[x] = result & 0x00FF;
-		state->v[0xF] = ~(result >> 8 & 0x01);
-		break;
-	case 0xE:
-		if (DEBUG1)
-			printf("SHL V%X, {V%X}\n", x, y);
-		state->v[x] =  state->v[x] << 1;
-		state->v[0xF] = state->v[x] & 0x80;
-		break;
-	default:
-		unimplementedInstruction(state);
-		break;
-	}
-}
-
-/**
- * Method processes instruction E types
- *
- * state - chip 8 state data
- */
-void processInstructionE(State *state)
-{
-	uint8_t x = state->ram[state->pc] & 0x0F;
-	uint8_t mode = state->ram[state->pc + 1] & 0xFF;
-	uint8_t key = state->v[x];
-	switch (mode)
-	{
-	case 0x9E:
-		if (DEBUG1)
-			printf("SKP V%X\n", x);
-		if (state->keydown && state->keydown(key & 0xF))
-			incrementPC(state);
-		break;
-	case 0xA1:
-		if (DEBUG1)
-			printf("SKNP V%X\n", x);
-		if (state->keydown && !state->keydown(key & 0xF))
-			incrementPC(state);
-		break;
-	default:
-		unimplementedInstruction(state);
-		break;
-	}
-}
-
-/**
- * Method processes instruction F types
- *
- * state - chip 8 state data
- */
-void processInstructionF(State *state)
-{
-	uint8_t x = state->ram[state->pc] & 0x0F;
-	uint8_t mode = state->ram[state->pc + 1] & 0xFF;
-
-	switch (mode)
-	{
-	case 0x07:
-		if (DEBUG1)
-			printf("LD V%X, DT\n", x);
-		state->v[x] = state->dt;
-		break;
-	case 0x0A:
-		if (DEBUG1)
-			printf("LD V%X, K\n", x);
-		state->keyWait = x;
-		break;
-	case 0x15:
-		if (DEBUG1)
-			printf("LD DT, V%X\n", x);
-		state->dt = state->v[x];
-		break;
-	case 0x18:
-		if (DEBUG1)
-			printf("LD ST, V%X\n", x);
-		state->st = state->v[x];
-		break;
-	case 0x1E:
-		if (DEBUG1)
-			printf("ADD I, V%X\n", x);
-		state->i = state->i + state->v[x];
-		break;
-	case 0x29:
-		if (DEBUG1)
-			printf("LD F, V%X\n", x);
-		state->i = CHIP8_LANGUAGE_OFFSET
-				+ (state->v[x] * (sizeof(Font4x5) / KEYPAD_SIZE));
-		break;
-	case 0x33:
-	{
-		if (DEBUG1)
-			printf("LD B, V%X\n", x);
-		state->ram[state->i + 2] = state->v[x] % 10;
-		state->ram[state->i + 1] = (state->v[x] / 10) % 10;
-		state->ram[state->i] = state->v[x] / 100;
-
-	}
-		break;
-	case 0x55:
-	{
-		if (DEBUG1)
-			printf("LD [I], V%X\n", x);
-		for (short i = 0; i <= x; ++i)
-			state->ram[state->i + i] = state->v[i];
-	}
-		break;
-	case 0x65:
-	{
-		if (DEBUG1)
-			printf("LD V%X, [I]\n", x);
-		for (short i = 0; i <= x; ++i)
-			state->v[i] = state->ram[state->i + i];
-	}
-		break;
-	default:
-		unimplementedInstruction(state);
-		break;
-
-	}
 }
 
 /**
@@ -405,9 +213,11 @@ void processInstructionF(State *state)
  */
 void executeStep(State *state)
 {
-	uint8_t byte1 = state->ram[state->pc] & 0x0F;
-	uint8_t byte2 = state->ram[state->pc + 1];
+	if (DEBUG)
+		printState(state);
 	setVariables(state);
+	incrementPC(state);
+
 	/* check for key press event */
 	if (state->keyWait != -1 && state->keydown)
 	{
@@ -429,111 +239,265 @@ void executeStep(State *state)
 		}
 	}
 
-	if (DEBUG)
-		printState(state);
 	switch (var.mode)
 	{
 	case 0x0:
-		processInstruction0(state);
+	{
+		switch (var.nnn)
+		{
+		case 0x0E0:
+			if (DEBUG1)
+				printf("CLS\n");
+			memset(state->display, 0, DISPLAY_SIZE);
+			break;
+		case 0x0EE:
+			if (DEBUG1)
+				printf("RET\n");
+			decrementSP(state);
+			state->pc = state->stack[state->sp];
+			state->stack[state->sp] = 0;
+		default:
+			unimplementedInstruction(state);
+			break;
+		}
+	}
 		break;
 	case 0x1:
 		if (DEBUG1)
 			printf("JP %03X\n", var.nnn);
-		state->pc = var.nnn - 2;
+		state->pc = var.nnn;
 		break;
 	case 0x2:
 		if (DEBUG1)
 			printf("CALL %03X\n", var.nnn);
-		state->stack[state->sp] = state->pc;
-		state->pc = var.nnn - 2;
-		incrementSP(state);
+		if (incrementSP(state))
+		{
+			state->stack[state->sp] = state->pc;
+			state->pc = var.nnn;
+		}
 		break;
 	case 0x3:
 		if (DEBUG1)
-			printf("SE V%X, %02X\n", byte1, byte2);
-		if (state->v[byte1] == byte2)
+			printf("SE V%X, %02X\n", var.x, var.kk);
+		if (state->v[var.x] == var.kk)
 			incrementPC(state);
 		break;
 	case 0x4:
 		if (DEBUG1)
-			printf("SNE V%X, %02X\n", byte1, byte2);
-		if (state->v[byte1] != byte2)
+			printf("SNE V%X, %02X\n", var.x, var.kk);
+		if (state->v[var.x] != var.kk)
 			incrementPC(state);
 		break;
 	case 0x5:
 		if (DEBUG1)
-			printf("SE V%X, V%X\n", byte1, byte2 >> 4 & 0x0F);
-		if (state->v[byte1] == state->v[byte2 >> 4 & 0x0F])
+			printf("SE V%X, V%X\n", var.x, var.y);
+		if (state->v[var.x] == state->v[var.y])
 			incrementPC(state);
 		break;
 	case 0x6:
 		if (DEBUG1)
-			printf("LD V%X, %02X\n", byte1, byte2);
-		state->v[byte1] = byte2;
+			printf("LD V%X, %02X\n", var.x, var.kk);
+		state->v[var.x] = var.kk;
 		break;
 	case 0x7:
 		if (DEBUG1)
-			printf("ADD V%X, %02X\n", byte1, byte2);
-		state->v[byte1] += byte2;
+			printf("ADD V%X, %02X\n", var.x, var.kk);
+		state->v[var.x] = state->v[var.x] + var.kk;
 		break;
 	case 0x8:
-		processInstruction8(state);
+	{
+		switch (var.n)
+		{
+		case 0x0:
+			if (DEBUG1)
+				printf("LD V%X, V%X\n", var.x, var.y);
+			state->v[var.x] = state->v[var.y];
+			break;
+		case 0x1:
+			if (DEBUG1)
+				printf("OR V%X, V%X\n", var.x, var.y);
+			state->v[var.x] = state->v[var.x] | state->v[var.y];
+			break;
+		case 0x2:
+			if (DEBUG1)
+				printf("AND V%X, V%X\n", var.x, var.y);
+			state->v[var.x] = state->v[var.x] & state->v[var.y];
+			break;
+		case 0x3:
+			if (DEBUG1)
+				printf("XOR V%X, V%X\n", var.x, var.y);
+			state->v[var.x] = state->v[var.x] ^ state->v[var.y];
+			break;
+		case 0x4:
+			if (DEBUG1)
+				printf("ADD V%X, V%X\n", var.x, var.y);
+			state->v[0xF] = (state->v[var.x] > ((state->v[var.x] + state->v[var.y]) & 0xFF));
+			state->v[var.x] = state->v[var.x] + state->v[var.y];
+			break;
+		case 0x5:
+			if (DEBUG1)
+				printf("SUB V%X, V%X\n", var.x, var.y);
+			state->v[0xF] = (state->v[var.x] > state->v[var.y]);
+			state->v[var.x] = state->v[var.x] - state->v[var.y];
+			break;
+		case 0x6:
+			if (DEBUG1)
+				printf("SHR V%X, {V%X}\n", var.x, var.y);
+			state->v[0xF] = state->v[var.x] & 0x1;
+			state->v[var.x] = state->v[var.x] >> 1;
+			break;
+		case 0x7:
+			if (DEBUG1)
+				printf("SUBN V%X, V%X\n", var.x, var.y);
+			state->v[0xF] = (state->v[var.x] < state->v[var.y]);
+			state->v[var.x] = state->v[var.y] - state->v[var.x];
+			break;
+		case 0xE:
+			if (DEBUG1)
+				printf("SHL V%X, {V%X}\n", var.x, var.y);
+			state->v[0xF] = ((state->v[var.x] & 0x80) != 0);
+			state->v[var.x] = state->v[var.x] << 1;
+			break;
+		default:
+			unimplementedInstruction(state);
+			break;
+		}
+	}
 		break;
 	case 0x9:
 		if (DEBUG1)
-			printf("SNE V%X, V%X\n", byte1, byte2 >> 4 & 0x0F);
-		if (state->v[byte1] != state->v[byte2 >> 4 & 0x0F])
+			printf("SNE V%X, V%X\n", var.x, var.y);
+		if (state->v[var.x] != state->v[var.y])
 			incrementPC(state);
 		break;
 	case 0xA:
 		if (DEBUG1)
-			printf("LD I, %02X%02X\n", byte1, byte2);
-		state->i = byte1 << 8 | byte2;
+			printf("LD I, %03X\n", var.nnn);
+		state->i = var.nnn;
 		break;
 	case 0xB:
 		if (DEBUG1)
-			printf("JP V0 %02X%02X\n", byte1, byte2);
-		state->pc = (byte1 << 8 | byte2) + state->v[0];
+			printf("JP V0 %03X\n", var.nnn);
+		state->pc = var.nnn + state->v[0];
 		break;
 	case 0xC:
 		if (DEBUG1)
-			printf("RND V%X, %02X\n", byte1, byte2);
-		state->v[byte1] = (rand() % 256) & byte2;
+			printf("RND V%X, %02X\n", var.x, var.kk);
+		state->v[var.x] = (rand() % 256) & var.kk;
 		break;
 	case 0xD:
 	{
 		if (DEBUG1)
-			printf("DRW V%X, V%X %X\n", byte1, byte2 >> 4 & 0x0F, byte2 & 0x0F);
-		uint8_t x = byte1;
-		uint8_t y = byte2 >> 4 & 0x0F;
-		uint8_t n = byte2 & 0x0F;
-
-		for (int j = 0; j < n; j++)
+			printf("DRW V%X, V%X %X\n", var.x, var.y, var.n);
+		for (int j = 0; j < var.n; j++)
 		{
 			uint8_t sprite = state->ram[state->i + j];
 			for (int i = 0; i < 8; i++)
 			{
-				int px = (state->v[x] + i) % DISPLAY_ROW_COUNT;
-				int py = (state->v[y] + j) % DISPLAY_COL_COUNT;
+				int px = (state->v[var.x] + i) % DISPLAY_ROW_COUNT;
+				int py = (state->v[var.y] + j) % DISPLAY_COL_COUNT;
 				int pos = DISPLAY_ROW_COUNT * py + px;
 				int pixel = (sprite & (1 << (7 - i))) != 0;
-				state->v[0xF] |= (state->display[pos] & pixel);
-				state->display[pos] ^= pixel;
+				state->v[0xF] = state->v[0xF] | (state->display[pos] & pixel);
+				state->display[pos] = state->display[pos] ^ pixel;
 			}
 		}
 	}
 		break;
 	case 0xE:
-		processInstructionE(state);
+		{
+			char key = state->v[var.x];
+			switch (var.kk)
+				{
+				case 0x9E:
+					if (DEBUG1)
+						printf("SKP V%X\n", var.x);
+					if (state->keydown && state->keydown(key & 0xF))
+						incrementPC(state);
+					break;
+				case 0xA1:
+					if (DEBUG1)
+						printf("SKNP V%X\n", var.x);
+					if (state->keydown && !state->keydown(key & 0xF))
+						incrementPC(state);
+					break;
+				default:
+					unimplementedInstruction(state);
+					break;
+				}
+		}
 		break;
 	case 0xF:
-		processInstructionF(state);
+		{
+			switch (var.kk)
+			{
+			case 0x07:
+				if (DEBUG1)
+					printf("LD V%X, DT\n", var.x);
+				state->v[var.x] = state->dt;
+				break;
+			case 0x0A:
+				if (DEBUG1)
+					printf("LD V%X, K\n", var.x);
+				state->keyWait = var.x;
+				break;
+			case 0x15:
+				if (DEBUG1)
+					printf("LD DT, V%X\n", var.x);
+				state->dt = state->v[var.x];
+				break;
+			case 0x18:
+				if (DEBUG1)
+					printf("LD ST, V%X\n", var.x);
+				state->st = state->v[var.x];
+				break;
+			case 0x1E:
+				if (DEBUG1)
+					printf("ADD I, V%X\n", var.x);
+				state->i = state->i + state->v[var.x];
+				break;
+			case 0x29:
+				if (DEBUG1)
+					printf("LD F, V%X\n", var.x);
+				state->i = CHIP8_LANGUAGE_OFFSET
+						+ (state->v[var.x] * (sizeof(Font4x5) / KEYPAD_SIZE));
+				break;
+			case 0x33:
+			{
+				if (DEBUG1)
+					printf("LD B, V%X\n", var.x);
+				state->ram[state->i + 2] = state->v[var.x] % 10;
+				state->ram[state->i + 1] = (state->v[var.x] / 10) % 10;
+				state->ram[state->i] = state->v[var.x] / 100;
+
+			}
+				break;
+			case 0x55:
+			{
+				if (DEBUG1)
+					printf("LD [I], V%X\n", var.x);
+				for (short i = 0; i <= var.x; ++i)
+					state->ram[state->i + i] = state->v[i];
+			}
+				break;
+			case 0x65:
+			{
+				if (DEBUG1)
+					printf("LD V%X, [I]\n", var.x);
+				for (short i = 0; i <= var.x; ++i)
+					state->v[i] = state->ram[state->i + i];
+			}
+				break;
+			default:
+				unimplementedInstruction(state);
+				break;
+
+			}
+		}
 		break;
 	default:
 		unimplementedInstruction(state);
 		break;
 
 	}
-	incrementPC(state);
-
 }
