@@ -3,7 +3,6 @@
  *
  */
 #include <iostream>
-#include <fstream>
 #include <ctime>
 #include "Chip8Core.h"
 #include "Chip8Ext.h"
@@ -26,8 +25,8 @@ int main(int argc, char** argv)
 	/* Initialize SDL Context. */
 	if (initializeContext())
 	{
-		fprintf(stderr, "Error initializing SDL graphical context:\n");
-		fprintf(stderr, "%s\n", SDL_GetError());
+		printf("Error initializing SDL graphical context:\n");
+		printf("%s\n", SDL_GetError());
 		return 1;
 	}
 
@@ -37,41 +36,10 @@ int main(int argc, char** argv)
 	initialize(&state);
 	state.keydown = &isKeydown;
 
-	/**
-	 * Open the binary file
-	 */
-	std::ifstream rom;
-	rom.open(argv[1], std::ios::in | std::ios::binary);
-	if (!rom)
+	if (loadFile(argv[1], &state))
 	{
-		printf("Unable to open %s\n", argv[1]);
 		return 1;
 	}
-
-	/**
-	 * Get size of the ROM
-	 */
-	rom.seekg(0, rom.end);
-	int romSize = rom.tellg();
-	rom.seekg(0, rom.beg);
-
-	/**
-	 * Verify rom is not too large for system
-	 */
-	int availableMemory = STACK_OFFSET - USER_PROGRAM_OFFSET;
-	if (romSize > availableMemory)
-	{
-		printf(
-				"User program exceeds memory capacity requesting %d available %d",
-				romSize, availableMemory);
-		return 1;
-	}
-
-	/**
-	 * Read ROM into memory and close file
-	 */
-	rom.read((char *) &state.ram[USER_PROGRAM_OFFSET], romSize);
-	rom.close();
 
 	int lastTicks = SDL_GetTicks();
 	int lastDelta = 0;

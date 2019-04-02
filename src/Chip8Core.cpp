@@ -5,12 +5,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fstream>
 #include "Chip8Core.h"
 #include "Chip8Font.h"
 
 using namespace std;
 
 int currDelta;
+Variables var;
 
 /**
  * Initialize Chip8 memory and states
@@ -22,6 +24,50 @@ void initialize(State *state)
 	state->pc = USER_PROGRAM_OFFSET;
 	state->keyWait = -1;
 	currDelta = 0;
+	memset(&var, 0, sizeof(Variables));
+}
+
+/**
+ * Loads the Chip8 file and places it in memory
+ */
+int loadFile(char *filename, State *state)
+{
+	/**
+	 * Open the binary file
+	 */
+	std::ifstream rom;
+	rom.open(filename, std::ios::in | std::ios::binary);
+	if (!rom)
+	{
+		printf("Unable to open %s\n", filename);
+		return 1;
+	}
+
+	/**
+	 * Get size of the ROM
+	 */
+	rom.seekg(0, rom.end);
+	int romSize = rom.tellg();
+	rom.seekg(0, rom.beg);
+
+	/**
+	 * Verify rom is not too large for system
+	 */
+	int availableMemory = STACK_OFFSET - USER_PROGRAM_OFFSET;
+	if (romSize > availableMemory)
+	{
+		printf(
+				"User program exceeds memory capacity requesting %d available %d",
+				romSize, availableMemory);
+		return 1;
+	}
+
+	/**
+	 * Read ROM into memory and close file
+	 */
+	rom.read((char *) &state->ram[USER_PROGRAM_OFFSET], romSize);
+	rom.close();
+	return 0;
 }
 
 /**
@@ -42,9 +88,29 @@ void updateTimerRegisters(State *state, int delta)
 			if (--state->st == 0)
 			{
 				printf("BEEP!\n");
+				fflush(stdout);
 			}
 		}
 	}
+}
+
+/**
+ * Sets the instruction variables for the given instruction
+ */
+void setVariables(State *state)
+{
+//	uint16_t nnn; //A 12-bit value, the lowest 12 bits of the instruction
+//	uint8_t kk; // An 8-bit value, the lowest 8 bits of the instruction
+//	uint8_t mode; // A 4-bit value, the upper 4 bits of the high byte of the instruction
+//	uint8_t x; // A 4-bit value, the lower 4 bits of the high byte of the instruction
+//	uint8_t y; // A 4-bit value, the upper 4 bits of the low byte of the instruction
+//	uint8_t n; // A 4-bit value, the lowest 4 bits of the instruction
+//	var.nnn =
+//
+//			uint8_t byte1 = state->ram[state->pc] & 0x0F;
+//			uint8_t byte2 = state->ram[state->pc + 1];
+//			uint8_t mode = state->ram[state->pc] >> 4 & 0x0F;
+
 }
 
 /**
@@ -197,19 +263,21 @@ void processInstruction8(State *state)
 	case 0x4:
 		if (DEBUG1)
 			printf("ADD V%X, V%X\n", x, y);
-		state->v[x] = state->v[x] + state->v[y];
-		state->v[0xF] = state->v[x] > ((state->v[x] + state->v[y]) & 0xFF);
+		result = state->v[x] + state->v[y];
+		state->v[x] = result & 0x00FF;
+		state->v[0xF] = result >> 8;
 		break;
 	case 0x5:
 		if (DEBUG1)
 			printf("SUB V%X, V%X\n", x, y);
-		state->v[x] = state->v[x] - state->v[y];
-		state->v[0xF] = (state->v[x] > state->v[y]);
+		result = state->v[x] - state->v[y];
+		state->v[x] = result & 0x00FF;
+		state->v[0xF] = ~(result >> 8 & 0x01);
 		break;
 	case 0x6:
 		if (DEBUG1)
 			printf("SHR V%X, {V%X}\n", x, y);
-		state->v[x] = state->v[x] >> 1;
+		state->v[x] =  state->v[x] >> 1;
 		state->v[0xF] = state->v[x] & 0x01;
 		break;
 	case 0x7:
@@ -217,13 +285,13 @@ void processInstruction8(State *state)
 			printf("SUBN V%X, V%X\n", x, y);
 		result = state->v[y] - state->v[x];
 		state->v[x] = result & 0x00FF;
-		state->v[0xF] = (state->v[y] > state->v[x]);
+		state->v[0xF] = ~(result >> 8 & 0x01);
 		break;
 	case 0xE:
 		if (DEBUG1)
 			printf("SHL V%X, {V%X}\n", x, y);
-		state->v[x] = state->v[x] << 1;
-		state->v[0xF] = ((state->v[x] & 0x80) != 0);
+		state->v[x] =  state->v[x] << 1;
+		state->v[0xF] = state->v[x] & 0x80;
 		break;
 	default:
 		unimplementedInstruction(state);
@@ -247,13 +315,13 @@ void processInstructionE(State *state)
 		if (DEBUG1)
 			printf("SKP V%X\n", x);
 		if (state->keydown && state->keydown(key & 0xF))
-			state->pc = (state->pc + 2) & 0xFFF;
+			incrementPC(state);
 		break;
 	case 0xA1:
 		if (DEBUG1)
 			printf("SKNP V%X\n", x);
 		if (state->keydown && !state->keydown(key & 0xF))
-			state->pc = (state->pc + 2) & 0xFFF;
+			incrementPC(state);
 		break;
 	default:
 		unimplementedInstruction(state);
@@ -346,7 +414,6 @@ void executeStep(State *state)
 	uint8_t byte1 = state->ram[state->pc] & 0x0F;
 	uint8_t byte2 = state->ram[state->pc + 1];
 	uint8_t mode = state->ram[state->pc] >> 4 & 0x0F;
-
 	/* check for key press event */
 	if (state->keyWait != -1 && state->keydown)
 	{
@@ -384,26 +451,26 @@ void executeStep(State *state)
 		if (DEBUG1)
 			printf("CALL %02X%02X\n", byte1, byte2);
 		state->stack[state->sp] = state->pc;
-		state->pc = byte1 << 8 | byte2;
+		state->pc = (byte1 << 8 | byte2) - 2;
 		incrementSP(state);
 		break;
 	case 0x3:
 		if (DEBUG1)
 			printf("SE V%X, %02X\n", byte1, byte2);
 		if (state->v[byte1] == byte2)
-			state->pc = (state->pc + 2) & 0xfff;
+			incrementPC(state);
 		break;
 	case 0x4:
 		if (DEBUG1)
 			printf("SNE V%X, %02X\n", byte1, byte2);
 		if (state->v[byte1] != byte2)
-			state->pc = (state->pc + 2) & 0xfff;
+			incrementPC(state);
 		break;
 	case 0x5:
 		if (DEBUG1)
 			printf("SE V%X, V%X\n", byte1, byte2 >> 4 & 0x0F);
 		if (state->v[byte1] == state->v[byte2 >> 4 & 0x0F])
-			state->pc = (state->pc + 2) & 0xfff;
+			incrementPC(state);
 		break;
 	case 0x6:
 		if (DEBUG1)
@@ -432,12 +499,12 @@ void executeStep(State *state)
 	case 0xB:
 		if (DEBUG1)
 			printf("JP V0 %02X%02X\n", byte1, byte2);
-		state->pc = ((byte1 << 8 | byte2) + state->v[0]) & 0xFFF;
+		state->pc = (byte1 << 8 | byte2) + state->v[0];
 		break;
 	case 0xC:
 		if (DEBUG1)
 			printf("RND V%X, %02X\n", byte1, byte2);
-		state->v[byte1] = rand() & byte2;
+		state->v[byte1] = (rand() % 256) & byte2;
 		break;
 	case 0xD:
 	{

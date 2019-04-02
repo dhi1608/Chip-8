@@ -71,8 +71,28 @@ const int KEYPAD_SIZE = 16;
  */
 const int CLOCK_RATE_MS = 1000 / 60;
 
+/**
+ * Keypad callback
+ */
 typedef int (*keypad_handler_t)(char);
 
+/**
+ * Structure for holding instruction variables
+ */
+typedef struct Variables
+{
+	uint16_t nnn; //A 12-bit value, the lowest 12 bits of the instruction
+	uint8_t kk; // An 8-bit value, the lowest 8 bits of the instruction
+	uint8_t mode; // A 4-bit value, the upper 4 bits of the high byte of the instruction
+	uint8_t x; // A 4-bit value, the lower 4 bits of the high byte of the instruction
+	uint8_t y; // A 4-bit value, the upper 4 bits of the low byte of the instruction
+	uint8_t n; // A 4-bit value, the lowest 4 bits of the instruction
+
+} Variables;
+
+/**
+ * Structure for holding Chip8 state values
+ */
 typedef struct State
 {
 	// Memory
@@ -99,5 +119,6 @@ typedef struct State
 void initialize(State *state);
 void executeStep(State *state);
 void updateTimerRegisters(State *state, int delta);
+int loadFile(char *filename, State *state);
 
 #endif /* CHIP8CORE_H */
