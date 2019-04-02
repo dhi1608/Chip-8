@@ -22,7 +22,7 @@ void initialize(State *state)
 	memset(state, 0, sizeof(State));
 	memcpy(&state->ram[CHIP8_LANGUAGE_OFFSET], &Font4x5, sizeof(Font4x5));
 	state->pc = USER_PROGRAM_OFFSET;
-	state->sp = -1;
+//	state->sp = -1;
 	state->keyWait = -1;
 	currDelta = 0;
 	memset(&var, 0, sizeof(Variables));
@@ -106,6 +106,7 @@ void setVariables(State *state)
     var.x = state->ram[state->pc] & 0xF;
     var.y = (state->ram[state->pc + 1] >> 4) & 0xF;
     var.n = state->ram[state->pc + 1] & 0xF;
+
 }
 
 /**
@@ -154,7 +155,7 @@ void printState(State *state)
  */
 bool incrementSP(State *state)
 {
-	if (state->sp < STACK_SIZE - 1)
+	if (state->sp < (STACK_SIZE - 1))
 		++state->sp;
 	else
 	{
@@ -201,8 +202,8 @@ bool incrementPC(State *state)
  */
 void unimplementedInstruction(State *state)
 {
-	printf("Error: Unimplemented instruction %04X\n", state->pc);
-	printf("Halt system!");
+	printf("Error: Unimplemented instruction PC[%04X]=>%X%03X\n", state->pc, var.mode, var.nnn);
+	printf("Halt system!\n");
 	printState(state);
 	exit(0);
 }
@@ -253,9 +254,12 @@ void executeStep(State *state)
 		case 0x0EE:
 			if (DEBUG1)
 				printf("RET\n");
-			decrementSP(state);
-			state->pc = state->stack[state->sp];
-			state->stack[state->sp] = 0;
+			if (decrementSP(state))
+			{
+				state->pc = state->stack[state->sp];
+				state->stack[state->sp] = 0;
+			}
+			break;
 		default:
 			unimplementedInstruction(state);
 			break;
@@ -270,9 +274,9 @@ void executeStep(State *state)
 	case 0x2:
 		if (DEBUG1)
 			printf("CALL %03X\n", var.nnn);
+		state->stack[state->sp] = state->pc;
 		if (incrementSP(state))
 		{
-			state->stack[state->sp] = state->pc;
 			state->pc = var.nnn;
 		}
 		break;
