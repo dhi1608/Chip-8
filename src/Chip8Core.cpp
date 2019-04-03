@@ -22,7 +22,6 @@ void initialize(State *state)
 	memset(state, 0, sizeof(State));
 	memcpy(&state->ram[CHIP8_LANGUAGE_OFFSET], &Font4x5, sizeof(Font4x5));
 	state->pc = USER_PROGRAM_OFFSET;
-//	state->sp = -1;
 	state->keyWait = -1;
 	currDelta = 0;
 	memset(&var, 0, sizeof(Variables));
@@ -106,7 +105,6 @@ void setVariables(State *state)
     var.x = state->ram[state->pc] & 0xF;
     var.y = (state->ram[state->pc + 1] >> 4) & 0xF;
     var.n = state->ram[state->pc + 1] & 0xF;
-
 }
 
 /**
@@ -222,7 +220,7 @@ void executeStep(State *state)
 	/* check for key press event */
 	if (state->keyWait != -1 && state->keydown)
 	{
-		for (int i = 0; i < 16; i++)
+		for (int i = 0; i < 16; ++i)
 		{
 			int status = state->keydown(i);
 			if (status)
@@ -343,6 +341,7 @@ void executeStep(State *state)
 				printf("SUB V%X, V%X\n", var.x, var.y);
 			state->v[0xF] = (state->v[var.x] > state->v[var.y]);
 			state->v[var.x] = state->v[var.x] - state->v[var.y];
+
 			break;
 		case 0x6:
 			if (DEBUG1)
@@ -393,10 +392,10 @@ void executeStep(State *state)
 	{
 		if (DEBUG1)
 			printf("DRW V%X, V%X %X\n", var.x, var.y, var.n);
-		for (int j = 0; j < var.n; j++)
+		for (int j = 0; j < var.n; ++j)
 		{
 			uint8_t sprite = state->ram[state->i + j];
-			for (int i = 0; i < 8; i++)
+			for (int i = 0; i < 8; ++i)
 			{
 				int px = (state->v[var.x] + i) % DISPLAY_ROW_COUNT;
 				int py = (state->v[var.y] + j) % DISPLAY_COL_COUNT;
