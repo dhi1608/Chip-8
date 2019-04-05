@@ -111,6 +111,7 @@ void setVariables(State *state)
 
 /**
  * Enabled by setting DEBUG=true
+ * NOTE: Enable instruction display by setting DEBUG1=true
  * Prints the registers and stack values
  */
 void printState(State *state)
@@ -237,7 +238,7 @@ void executeStep(State *state)
 
 	setVariables(state);
 	if (DEBUG)
-			printState(state);
+		printState(state);
 	incrementPC(state);
 
 	switch (var.mode)
@@ -395,10 +396,10 @@ void executeStep(State *state)
 		if (DEBUG1)
 			printf("DRW V%X, V%X %X\n", var.x, var.y, var.n);
 		state->v[0xF] = 0;
-		for (int j = 0; j < var.n; j++)
+		for (int j = 0; j < var.n; ++j)
 		{
 			uint8_t sprite = state->ram[state->i + j];
-			for (int i = 0; i < 8; i++)
+			for (int i = 0; i < 8; ++i)
 			{
 				int px = (state->v[var.x] + i) % DISPLAY_ROW_COUNT;
 				int py = (state->v[var.y] + j) % DISPLAY_COL_COUNT;
@@ -418,13 +419,13 @@ void executeStep(State *state)
 		case 0x9E:
 			if (DEBUG1)
 				printf("SKP V%X\n", var.x);
-			if (state->keydown && state->keydown(key & 0xF))
+			if (state->keydown && state->keydown(key))
 				incrementPC(state);
 			break;
 		case 0xA1:
 			if (DEBUG1)
 				printf("SKNP V%X\n", var.x);
-			if (state->keydown && !state->keydown(key & 0xF))
+			if (state->keydown && !state->keydown(key))
 				incrementPC(state);
 			break;
 		default:
@@ -465,7 +466,8 @@ void executeStep(State *state)
 		case 0x29:
 			if (DEBUG1)
 				printf("LD F, V%X\n", var.x);
-			state->i = CHIP8_LANGUAGE_OFFSET + state->v[var.x] * (sizeof(Font4x5) / KEYPAD_SIZE);
+			state->i = CHIP8_LANGUAGE_OFFSET
+					+ state->v[var.x] * (sizeof(Font4x5) / KEYPAD_SIZE);
 
 			break;
 		case 0x33:
@@ -481,7 +483,7 @@ void executeStep(State *state)
 		{
 			if (DEBUG1)
 				printf("LD [I], V%X\n", var.x);
-			for (int i = 0; i <= var.x; i++)
+			for (int i = 0; i <= var.x; ++i)
 			{
 				state->ram[state->i + i] = state->v[i];
 			}
@@ -491,7 +493,7 @@ void executeStep(State *state)
 		{
 			if (DEBUG1)
 				printf("LD V%X, [I]\n", var.x);
-			for (int i = 0; i <= var.x; i++)
+			for (int i = 0; i <= var.x; ++i)
 				state->v[i] = state->ram[state->i + i];
 		}
 			break;

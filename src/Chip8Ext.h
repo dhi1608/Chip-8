@@ -23,8 +23,7 @@ static SDL_Texture* texture = NULL;
 /**
  * This array maps a SDL scancode to the CHIP-8 key that serves as index
  * for the array. For instance, pressing key keys[5] on your keyboard will
- * make your CHIP-8 understand as if you pressed the [5] key. Remember that
- * CHIP-8 uses a 16-key keyboard with keys labeled 0..F.
+ * make your CHIP-8 understand as if you pressed the [5] key.
  */
 const char keys[] = {
     SDL_SCANCODE_1, // 0

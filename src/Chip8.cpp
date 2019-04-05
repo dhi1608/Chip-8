@@ -1,8 +1,7 @@
 /*
  * Chip8.cpp
- *
  */
-#include <iostream>
+#include <cstdio>
 #include <ctime>
 #include "Chip8Core.h"
 #include "Chip8Ext.h"
@@ -48,21 +47,23 @@ int main(int argc, char** argv)
 
 	while (!isCloseRequested())
 	{
-		/* Update timers. */
+		/* Update deltas for instruction steps, timers and display*/
 		lastDelta = SDL_GetTicks() - lastTicks;
 		lastTicks = SDL_GetTicks();
 		stepDelta += lastDelta;
 		renderDelta += lastDelta;
 
+		/* Chip8 instruction */
 		while (stepDelta >= 1)
 		{
 			executeStep(&state);
 			stepDelta--;
 		}
 
+		/* Chip8 timers */
 		updateTimerRegisters(&state, lastDelta);
 
-		/* Render frame every 1/60th of second. */
+		/* Display refresh */
 		while (renderDelta >= CLOCK_RATE_MS)
 		{
 			renderDisplay(&state);
