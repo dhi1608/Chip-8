@@ -56,9 +56,6 @@ int main(int argc, char** argv)
 
 		while (stepDelta >= 1)
 		{
-//	TODO step thru code
-//			char k;
-//			std::cin >> k;
 			executeStep(&state);
 			stepDelta--;
 		}

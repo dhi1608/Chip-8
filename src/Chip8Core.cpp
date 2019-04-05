@@ -87,6 +87,7 @@ void updateTimerRegisters(State *state, int delta)
 		{
 			if (--state->st == 0)
 			{
+				//TODO figure out the sound logic
 				printf("BEEP!\n");
 				fflush(stdout);
 			}
@@ -100,11 +101,12 @@ void updateTimerRegisters(State *state, int delta)
 void setVariables(State *state)
 {
 	var.nnn = ((state->ram[state->pc] & 0xF) << 8) | state->ram[state->pc + 1];
-    var.kk = state->ram[state->pc + 1];
-    var.mode = (state->ram[state->pc] >> 4) & 0xF;
-    var.x = state->ram[state->pc] & 0xF;
-    var.y = (state->ram[state->pc + 1] >> 4) & 0xF;
-    var.n = state->ram[state->pc + 1] & 0xF;
+	var.kk = state->ram[state->pc + 1];
+	var.mode = (state->ram[state->pc] >> 4) & 0xF;
+	var.x = state->ram[state->pc] & 0xF;
+	var.y = (state->ram[state->pc + 1] >> 4) & 0xF;
+	var.n = state->ram[state->pc + 1] & 0xF;
+
 }
 
 /**
@@ -124,7 +126,7 @@ void printState(State *state)
 	/**
 	 * Print V[0:F]
 	 */
-	for (short i = 1; i <= KEYPAD_SIZE; ++i)
+	for (int i = 1; i <= KEYPAD_SIZE; ++i)
 	{
 		printf("V[%X]:%02X", i - 1, state->v[i - 1]);
 		if (i % 4 == 0)
@@ -136,9 +138,9 @@ void printState(State *state)
 	/**
 	 * Print Stack
 	 */
-	for (short i = 1; i <= STACK_SIZE; ++i)
+	for (int i = 1; i <= STACK_SIZE; ++i)
 	{
-		printf("S[%04X]:%04X", STACK_OFFSET + i * 2, state->stack[i - 1]);
+		printf("S[%04X]:%04X", STACK_OFFSET + (i - 1) * 2, state->stack[i - 1]);
 		if (i % 4 == 0)
 			printf("\n");
 		else
@@ -200,9 +202,9 @@ bool incrementPC(State *state)
  */
 void unimplementedInstruction(State *state)
 {
-	printf("Error: Unimplemented instruction PC[%04X]=>%X%03X\n", state->pc, var.mode, var.nnn);
+	printf("Error: Unimplemented instruction PC[%04X]=>%X%03X\n", state->pc,
+			var.mode, var.nnn);
 	printf("Halt system!\n");
-	printState(state);
 	exit(0);
 }
 
@@ -212,11 +214,6 @@ void unimplementedInstruction(State *state)
  */
 void executeStep(State *state)
 {
-	if (DEBUG)
-		printState(state);
-	setVariables(state);
-	incrementPC(state);
-
 	/* check for key press event */
 	if (state->keyWait != -1 && state->keydown)
 	{
@@ -237,6 +234,11 @@ void executeStep(State *state)
 			return;
 		}
 	}
+
+	setVariables(state);
+	if (DEBUG)
+			printState(state);
+	incrementPC(state);
 
 	switch (var.mode)
 	{
@@ -318,48 +320,48 @@ void executeStep(State *state)
 		case 0x1:
 			if (DEBUG1)
 				printf("OR V%X, V%X\n", var.x, var.y);
-			state->v[var.x] = state->v[var.x] | state->v[var.y];
+			state->v[var.x] |= state->v[var.y];
 			break;
 		case 0x2:
 			if (DEBUG1)
 				printf("AND V%X, V%X\n", var.x, var.y);
-			state->v[var.x] = state->v[var.x] & state->v[var.y];
+			state->v[var.x] &= state->v[var.y];
 			break;
 		case 0x3:
 			if (DEBUG1)
 				printf("XOR V%X, V%X\n", var.x, var.y);
-			state->v[var.x] = state->v[var.x] ^ state->v[var.y];
+			state->v[var.x] ^= state->v[var.y];
 			break;
 		case 0x4:
 			if (DEBUG1)
 				printf("ADD V%X, V%X\n", var.x, var.y);
-			state->v[0xF] = (state->v[var.x] > ((state->v[var.x] + state->v[var.y]) & 0xFF));
-			state->v[var.x] = state->v[var.x] + state->v[var.y];
+			state->v[0xF] = state->v[var.x]
+					> ((state->v[var.x] + state->v[var.y]) & 0xFF);
+			state->v[var.x] += state->v[var.y];
 			break;
 		case 0x5:
 			if (DEBUG1)
 				printf("SUB V%X, V%X\n", var.x, var.y);
 			state->v[0xF] = (state->v[var.x] > state->v[var.y]);
-			state->v[var.x] = state->v[var.x] - state->v[var.y];
-
+			state->v[var.x] -= state->v[var.y];
 			break;
 		case 0x6:
 			if (DEBUG1)
 				printf("SHR V%X, {V%X}\n", var.x, var.y);
-			state->v[0xF] = state->v[var.x] & 0x1;
-			state->v[var.x] = state->v[var.x] >> 1;
+			state->v[0xF] = (state->v[var.x] & 0x1);
+			state->v[var.x] >>= 1;
 			break;
 		case 0x7:
 			if (DEBUG1)
 				printf("SUBN V%X, V%X\n", var.x, var.y);
-			state->v[0xF] = (state->v[var.x] < state->v[var.y]);
+			state->v[0xF] = (state->v[var.y] > state->v[var.x]);
 			state->v[var.x] = state->v[var.y] - state->v[var.x];
 			break;
 		case 0xE:
 			if (DEBUG1)
 				printf("SHL V%X, {V%X}\n", var.x, var.y);
 			state->v[0xF] = ((state->v[var.x] & 0x80) != 0);
-			state->v[var.x] = state->v[var.x] << 1;
+			state->v[var.x] <<= 1;
 			break;
 		default:
 			unimplementedInstruction(state);
@@ -381,7 +383,7 @@ void executeStep(State *state)
 	case 0xB:
 		if (DEBUG1)
 			printf("JP V0 %03X\n", var.nnn);
-		state->pc = var.nnn + state->v[0];
+		state->pc = state->v[0] + var.nnn;
 		break;
 	case 0xC:
 		if (DEBUG1)
@@ -392,111 +394,113 @@ void executeStep(State *state)
 	{
 		if (DEBUG1)
 			printf("DRW V%X, V%X %X\n", var.x, var.y, var.n);
-		for (int j = 0; j < var.n; ++j)
+		state->v[0xF] = 0;
+		for (int j = 0; j < var.n; j++)
 		{
 			uint8_t sprite = state->ram[state->i + j];
-			for (int i = 0; i < 8; ++i)
+			for (int i = 0; i < 8; i++)
 			{
 				int px = (state->v[var.x] + i) % DISPLAY_ROW_COUNT;
 				int py = (state->v[var.y] + j) % DISPLAY_COL_COUNT;
 				int pos = DISPLAY_ROW_COUNT * py + px;
 				int pixel = (sprite & (1 << (7 - i))) != 0;
-				state->v[0xF] = state->v[0xF] | (state->display[pos] & pixel);
-				state->display[pos] = state->display[pos] ^ pixel;
+				state->v[0xF] |= (state->display[pos] & pixel);
+				state->display[pos] ^= pixel;
 			}
 		}
 	}
 		break;
 	case 0xE:
+	{
+		char key = state->v[var.x];
+		switch (var.kk)
 		{
-			char key = state->v[var.x];
-			switch (var.kk)
-				{
-				case 0x9E:
-					if (DEBUG1)
-						printf("SKP V%X\n", var.x);
-					if (state->keydown && state->keydown(key & 0xF))
-						incrementPC(state);
-					break;
-				case 0xA1:
-					if (DEBUG1)
-						printf("SKNP V%X\n", var.x);
-					if (state->keydown && !state->keydown(key & 0xF))
-						incrementPC(state);
-					break;
-				default:
-					unimplementedInstruction(state);
-					break;
-				}
+		case 0x9E:
+			if (DEBUG1)
+				printf("SKP V%X\n", var.x);
+			if (state->keydown && state->keydown(key & 0xF))
+				incrementPC(state);
+			break;
+		case 0xA1:
+			if (DEBUG1)
+				printf("SKNP V%X\n", var.x);
+			if (state->keydown && !state->keydown(key & 0xF))
+				incrementPC(state);
+			break;
+		default:
+			unimplementedInstruction(state);
+			break;
 		}
+	}
 		break;
 	case 0xF:
+	{
+		switch (var.kk)
 		{
-			switch (var.kk)
-			{
-			case 0x07:
-				if (DEBUG1)
-					printf("LD V%X, DT\n", var.x);
-				state->v[var.x] = state->dt;
-				break;
-			case 0x0A:
-				if (DEBUG1)
-					printf("LD V%X, K\n", var.x);
-				state->keyWait = var.x;
-				break;
-			case 0x15:
-				if (DEBUG1)
-					printf("LD DT, V%X\n", var.x);
-				state->dt = state->v[var.x];
-				break;
-			case 0x18:
-				if (DEBUG1)
-					printf("LD ST, V%X\n", var.x);
-				state->st = state->v[var.x];
-				break;
-			case 0x1E:
-				if (DEBUG1)
-					printf("ADD I, V%X\n", var.x);
-				state->i = state->i + state->v[var.x];
-				break;
-			case 0x29:
-				if (DEBUG1)
-					printf("LD F, V%X\n", var.x);
-				state->i = CHIP8_LANGUAGE_OFFSET
-						+ (state->v[var.x] * (sizeof(Font4x5) / KEYPAD_SIZE));
-				break;
-			case 0x33:
-			{
-				if (DEBUG1)
-					printf("LD B, V%X\n", var.x);
-				state->ram[state->i + 2] = state->v[var.x] % 10;
-				state->ram[state->i + 1] = (state->v[var.x] / 10) % 10;
-				state->ram[state->i] = state->v[var.x] / 100;
+		case 0x07:
+			if (DEBUG1)
+				printf("LD V%X, DT\n", var.x);
+			state->v[var.x] = state->dt;
+			break;
+		case 0x0A:
+			if (DEBUG1)
+				printf("LD V%X, K\n", var.x);
+			state->keyWait = var.x;
+			break;
+		case 0x15:
+			if (DEBUG1)
+				printf("LD DT, V%X\n", var.x);
+			state->dt = state->v[var.x];
+			break;
+		case 0x18:
+			if (DEBUG1)
+				printf("LD ST, V%X\n", var.x);
+			state->st = state->v[var.x];
+			break;
+		case 0x1E:
+			if (DEBUG1)
+				printf("ADD I, V%X\n", var.x);
+			state->i += state->v[var.x];
+			break;
+		case 0x29:
+			if (DEBUG1)
+				printf("LD F, V%X\n", var.x);
+			state->i = CHIP8_LANGUAGE_OFFSET + state->v[var.x] * (sizeof(Font4x5) / KEYPAD_SIZE);
 
-			}
-				break;
-			case 0x55:
+			break;
+		case 0x33:
+		{
+			if (DEBUG1)
+				printf("LD B, V%X\n", var.x);
+			state->ram[state->i + 2] = state->v[var.x] % 10;
+			state->ram[state->i + 1] = (state->v[var.x] / 10) % 10;
+			state->ram[state->i] = state->v[var.x] / 100;
+		}
+			break;
+		case 0x55:
+		{
+			if (DEBUG1)
+				printf("LD [I], V%X\n", var.x);
+			for (int i = 0; i <= var.x; i++)
 			{
-				if (DEBUG1)
-					printf("LD [I], V%X\n", var.x);
-				for (short i = 0; i <= var.x; ++i)
-					state->ram[state->i + i] = state->v[i];
-			}
-				break;
-			case 0x65:
-			{
-				if (DEBUG1)
-					printf("LD V%X, [I]\n", var.x);
-				for (short i = 0; i <= var.x; ++i)
-					state->v[i] = state->ram[state->i + i];
-			}
-				break;
-			default:
-				unimplementedInstruction(state);
-				break;
-
+				state->ram[state->i + i] = state->v[i];
 			}
 		}
+			break;
+		case 0x65:
+		{
+			if (DEBUG1)
+				printf("LD V%X, [I]\n", var.x);
+			for (int i = 0; i <= var.x; i++)
+				state->v[i] = state->ram[state->i + i];
+		}
+			break;
+		default:
+			unimplementedInstruction(state);
+			break;
+
+		}
+	}
 		break;
 	default:
 		unimplementedInstruction(state);

@@ -27,22 +27,22 @@ static SDL_Texture* texture = NULL;
  * CHIP-8 uses a 16-key keyboard with keys labeled 0..F.
  */
 const char keys[] = {
-    SDL_SCANCODE_0, // 0
-    SDL_SCANCODE_1, // 1
-    SDL_SCANCODE_2, // 2
-    SDL_SCANCODE_3, // 3
-    SDL_SCANCODE_4, // 4
-    SDL_SCANCODE_5, // 5
-    SDL_SCANCODE_6, // 6
-    SDL_SCANCODE_7, // 7
-    SDL_SCANCODE_8, // 8
-    SDL_SCANCODE_9, // 9
-    SDL_SCANCODE_A, // A
-    SDL_SCANCODE_B, // B
-    SDL_SCANCODE_C, // C
-    SDL_SCANCODE_D, // D
-    SDL_SCANCODE_E, // E
-    SDL_SCANCODE_F  // F
+    SDL_SCANCODE_1, // 0
+    SDL_SCANCODE_2, // 1
+    SDL_SCANCODE_3, // 2
+    SDL_SCANCODE_4, // 3
+    SDL_SCANCODE_Q, // 4
+    SDL_SCANCODE_W, // 5
+    SDL_SCANCODE_E, // 6
+    SDL_SCANCODE_R, // 7
+    SDL_SCANCODE_A, // 8
+    SDL_SCANCODE_S, // 9
+    SDL_SCANCODE_D, // A
+    SDL_SCANCODE_F, // B
+    SDL_SCANCODE_Z, // C
+    SDL_SCANCODE_X, // D
+    SDL_SCANCODE_C, // E
+    SDL_SCANCODE_V  // F
 };
 
 int initializeContext();

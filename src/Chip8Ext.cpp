@@ -37,7 +37,7 @@ int initializeContext()
     if (SDL_Init(SDL_INIT_EVERYTHING)) {
         return 1;
     }
-    window = SDL_CreateWindow("CHIP-8",
+    window = SDL_CreateWindow("CHIP8",
             SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
             640, 320, SDL_WINDOW_SHOWN);
     if (window == NULL) {
